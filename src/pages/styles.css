@@ -1,0 +1,120 @@
+/* Key Data Points Styling */
+.key-data-points {
+  background-color: #e8f5e9;
+  padding: 24px;
+  border-radius: 8px;
+}
+
+.key-data-points h3 {
+  color: #2e7d32;
+  font-size: 24px;
+  margin: 0 0 32px 0;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.data-point {
+  display: flex;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 16px;
+  background-color: white;
+  border-radius: 4px;
+}
+
+.data-point:last-child {
+  margin-bottom: 0;
+}
+
+.data-point .number {
+  font-size: 48px;
+  font-weight: 500;
+  color: #2e7d32;
+  margin-right: 24px;
+  min-width: 60px;
+}
+
+.data-point .label {
+  color: #2e7d32;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* Chart Container Layout */
+.chart-container {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.chart-side {
+  flex: 3;
+}
+
+.data-side {
+  flex: 1;
+  min-width: 280px;
+}
+
+/* Date Picker Styling */
+.date-picker {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #123522;
+  border-radius: 4px;
+  font-size: 16px;
+  color: #123522;
+  background-color: white;
+}
+
+/* Calendar Popup Styling */
+.react-datepicker {
+  font-family: inherit;
+  border: 1px solid #123522;
+  border-radius: 4px;
+}
+
+.react-datepicker__header {
+  background-color: #dff5c1;
+  border-bottom: 1px solid #123522;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #123522;
+}
+
+.react-datepicker__day {
+  color: #123522;
+}
+
+.react-datepicker__day:hover {
+  background-color: #dff5c1;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #123522 !important;
+  color: #dff5c1 !important;
+}
+
+.react-datepicker__year-dropdown {
+  background-color: white;
+  border: 1px solid #123522;
+}
+
+.react-datepicker__year-option:hover {
+  background-color: #dff5c1;
+}
+
+.react-datepicker__navigation:hover *::before {
+  border-color: #123522;
+}
+
+.react-datepicker__year-read-view--down-arrow {
+  border-top-color: #123522;
+}
+
+.react-datepicker__year-dropdown-container {
+  color: #123522;
+} 
