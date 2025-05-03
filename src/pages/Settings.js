@@ -1,220 +1,194 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaBell, FaEnvelope } from 'react-icons/fa';
+import { supabase } from '../supabaseClient';
 
 const Settings = () => {
   const [settings, setSettings] = useState({
-    pushNotifications: true,
+    pushNotifications: false,
     emailNotifications: false,
     dailyAirQuality: true,
     airQualityAlerts: true,
     healthImpact: true,
     weeklyReports: true
   });
+  
+  // Add state to track if settings have been modified
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchNotificationPreferences();
+  }, []);
+
+  const fetchNotificationPreferences = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setSettings({
+          pushNotifications: data.push_notifications,
+          emailNotifications: data.email_notifications,
+          dailyAirQuality: data.daily_air_quality,
+          airQualityAlerts: data.air_quality_alerts,
+          healthImpact: data.health_impact_updates,
+          weeklyReports: data.weekly_reports
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      setError('Failed to load settings');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleToggle = (setting) => {
     setSettings(prev => ({
       ...prev,
       [setting]: !prev[setting]
     }));
+    setHasChanges(true); // Mark that changes have been made
   };
 
-  const handleSave = () => {
-    // TODO: Implement save functionality
-    console.log('Settings saved:', settings);
+  const saveSettings = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert({
+          user_id: user.id,
+          push_notifications: settings.pushNotifications,
+          email_notifications: settings.emailNotifications,
+          daily_air_quality: settings.dailyAirQuality,
+          air_quality_alerts: settings.airQualityAlerts,
+          health_impact_updates: settings.healthImpact,
+          weekly_reports: settings.weeklyReports,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) throw error;
+
+      setHasChanges(false); // Reset changes flag after successful save
+    } catch (error) {
+      console.error('Error saving notification preferences:', error);
+      setError('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <div className="notification-settings">Loading...</div>;
+  }
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Notification Settings</h1>
+    <div className="notification-settings">
+      <h1>Notification Settings</h1>
 
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>Notification Methods</h2>
-        <div style={styles.settingItem}>
-          <div style={styles.settingHeader}>
-            <FaBell style={styles.icon} />
-            <span style={styles.settingLabel}>Push Notifications</span>
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="notification-section">
+        <h2>Notification Methods</h2>
+        <div className="notification-method">
+          <div className="method-info">
+            <FaBell className="method-icon" />
+            <span>Push Notifications</span>
           </div>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.pushNotifications}
-              onChange={() => handleToggle('pushNotifications')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+          <div 
+            className={`pill-toggle ${settings.pushNotifications ? 'active' : ''}`}
+            onClick={() => handleToggle('pushNotifications')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
 
-        <div style={styles.settingItem}>
-          <div style={styles.settingHeader}>
-            <FaEnvelope style={styles.icon} />
-            <span style={styles.settingLabel}>Email Notifications</span>
+        <div className="notification-method">
+          <div className="method-info">
+            <FaEnvelope className="method-icon" />
+            <span>Email Notifications</span>
           </div>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.emailNotifications}
-              onChange={() => handleToggle('emailNotifications')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+          <div 
+            className={`pill-toggle ${settings.emailNotifications ? 'active' : ''}`}
+            onClick={() => handleToggle('emailNotifications')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
       </div>
 
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>Alert Types</h2>
+      <div className="notification-section">
+        <h2>Alert Types</h2>
         
-        <div style={styles.settingItem}>
-          <span style={styles.settingLabel}>Daily Air Quality Summary</span>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.dailyAirQuality}
-              onChange={() => handleToggle('dailyAirQuality')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+        <div className="notification-method">
+          <span>Daily Air Quality Summary</span>
+          <div 
+            className={`pill-toggle ${settings.dailyAirQuality ? 'active' : ''}`}
+            onClick={() => handleToggle('dailyAirQuality')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
 
-        <div style={styles.settingItem}>
-          <span style={styles.settingLabel}>Air Quality Alerts</span>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.airQualityAlerts}
-              onChange={() => handleToggle('airQualityAlerts')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+        <div className="notification-method">
+          <span>Air Quality Alerts</span>
+          <div 
+            className={`pill-toggle ${settings.airQualityAlerts ? 'active' : ''}`}
+            onClick={() => handleToggle('airQualityAlerts')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
 
-        <div style={styles.settingItem}>
-          <span style={styles.settingLabel}>Health Impact Updates</span>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.healthImpact}
-              onChange={() => handleToggle('healthImpact')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+        <div className="notification-method">
+          <span>Health Impact Updates</span>
+          <div 
+            className={`pill-toggle ${settings.healthImpact ? 'active' : ''}`}
+            onClick={() => handleToggle('healthImpact')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
 
-        <div style={styles.settingItem}>
-          <span style={styles.settingLabel}>Weekly Health Reports</span>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.weeklyReports}
-              onChange={() => handleToggle('weeklyReports')}
-            />
-            <span style={styles.slider}></span>
-          </label>
+        <div className="notification-method">
+          <span>Weekly Health Reports</span>
+          <div 
+            className={`pill-toggle ${settings.weeklyReports ? 'active' : ''}`}
+            onClick={() => handleToggle('weeklyReports')}
+          >
+            <div className="toggle-slider" />
+          </div>
         </div>
       </div>
 
-      <button onClick={handleSave} style={styles.saveButton}>
-        Save Notification Settings
-      </button>
+      <div className="settings-footer">
+        <button 
+          className="save-settings-button"
+          onClick={saveSettings}
+          disabled={!hasChanges || isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Save Settings'}
+        </button>
+      </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: '24px',
-    maxWidth: '800px',
-    margin: '0 auto',
-  },
-  title: {
-    color: '#043A24',
-    marginBottom: '32px',
-    fontSize: '28px',
-    fontWeight: '600',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '24px',
-    boxShadow: '0 2px 4px rgba(4, 58, 36, 0.1)',
-  },
-  sectionTitle: {
-    color: '#043A24',
-    fontSize: '20px',
-    fontWeight: '500',
-    marginBottom: '20px',
-  },
-  settingItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 0',
-    borderBottom: '1px solid rgba(4, 58, 36, 0.1)',
-    '&:last-child': {
-      borderBottom: 'none',
-    },
-  },
-  settingHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  icon: {
-    fontSize: '20px',
-    color: '#043A24',
-  },
-  settingLabel: {
-    color: '#043A24',
-    fontSize: '16px',
-  },
-  switch: {
-    position: 'relative',
-    display: 'inline-block',
-    width: '48px',
-    height: '24px',
-  },
-  slider: {
-    position: 'absolute',
-    cursor: 'pointer',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#ccc',
-    transition: '0.4s',
-    borderRadius: '24px',
-    '&:before': {
-      position: 'absolute',
-      content: '""',
-      height: '20px',
-      width: '20px',
-      left: '2px',
-      bottom: '2px',
-      backgroundColor: 'white',
-      transition: '0.4s',
-      borderRadius: '50%',
-    },
-  },
-  'input:checked + span': {
-    backgroundColor: '#A9ED8A',
-  },
-  'input:checked + span:before': {
-    transform: 'translateX(24px)',
-  },
-  saveButton: {
-    backgroundColor: '#043A24',
-    color: '#FFFFFF',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s ease',
-    '&:hover': {
-      backgroundColor: '#032918',
-    },
-  },
 };
 
 export default Settings; 

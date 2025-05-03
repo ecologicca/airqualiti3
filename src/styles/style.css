@@ -1811,4 +1811,115 @@ body {
     font-size: 0.9rem;
   }
   
+  /* Add these styles for the circular toggles */
+  .circular-toggle {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .toggle-circle {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    border: 2px solid #043A24;
+    transition: background-color 0.2s ease;
+  }
+  
+  .toggle-circle.active {
+    background-color: #043A24;
+  }
+  
+  /* Update existing notification method styles */
+  .notification-method {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .method-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .method-icon {
+    font-size: 1.5rem;
+    color: #043A24;
+  }
+  
+  /* Update toggle styles to match the pill design */
+  .pill-toggle {
+    width: 50px;
+    height: 28px;
+    background-color: #D3D3D3; /* grey when off */
+    border-radius: 34px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .pill-toggle.active {
+    background-color: #043A24; /* brand dark green when on */
+  }
+  
+  .toggle-slider {
+    position: absolute;
+    content: "";
+    height: 24px;
+    width: 24px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+  }
+  
+  .pill-toggle.active .toggle-slider {
+    transform: translateX(22px);
+  }
+  
+  /* Add styles for the save button and messages */
+  .settings-footer {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem;
+    border-top: 1px solid #eee;
+  }
+  
+  .save-settings-button {
+    background-color: #043A24;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .save-settings-button:hover:not(:disabled) {
+    background-color: #032918;
+  }
+  
+  .save-settings-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .error-message {
+    background-color: #fee2e2;
+    color: #dc2626;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  
   
