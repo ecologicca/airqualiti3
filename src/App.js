@@ -15,6 +15,7 @@ import SplashPage from './pages/SplashPage';
 import Insights from './pages/Insights';
 import Resources from './pages/Resources';
 import Settings from './pages/Settings';
+import AuthCallback from './pages/auth/callback';
 import './styles/style.css';
 
 const App = () => {
@@ -84,6 +85,7 @@ const App = () => {
               <Route path="/preferences" element={<Layout><UserPreferences /></Layout>} />
               <Route path="/questionnaire" element={<Layout><Questionnaire /></Layout>} />
               <Route path="/anxietydashboard" element={<Layout><AnxietyDashboard /></Layout>} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
             </>
           ) : (
             // Redirect to login or splash page depending on beta access
