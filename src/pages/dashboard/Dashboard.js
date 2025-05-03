@@ -76,6 +76,37 @@ const Dashboard = () => {
     }
   };
 
+  const triggerNewDataFetch = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // Get the current user's session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Make the API call with the session token
+      const response = await fetch('https://app.ecologicca.com/api/test-fetch', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.statusText}`);
+      }
+      
+      // Wait a few seconds for the data to be stored
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Then fetch the updated data
+      await fetchData();
+    } catch (error) {
+      console.error('Error triggering data fetch:', error);
+      alert('Failed to refresh data. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 60 * 60 * 1000); // Refresh every hour
@@ -117,7 +148,7 @@ const Dashboard = () => {
         <span>Air Quality Dashboard</span>
         <button 
           className="refresh-button"
-          onClick={fetchData}
+          onClick={triggerNewDataFetch}
           disabled={isRefreshing}
         >
           {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
