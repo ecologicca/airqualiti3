@@ -1,74 +1,77 @@
 // App.js
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './supabaseClient';
-import Navbar from './components/layout/Navbar';
-import Sidebar from './components/layout/Sidebar';
+import Layout from './components/layout/Layout';
 import Dashboard from './pages/dashboard/Dashboard';
-import AnxietyDashboard from './pages/dashboard/AnxietyDashboard';
-import UserPreferences from './pages/UserPreferences';
-import Login from './pages/login';
-import SignUp from './pages/signUp';
-import Questionnaire from './pages/Questionnaire';
-import ResetPassword from './pages/ResetPassword';
-import './styles/style.css';
+import Preferences from './pages/UserPreferences';
+import Insights from './pages/Insights';
+import Resources from './pages/Resources';
+import Settings from './pages/Settings';
+import Login from './pages/login.js';
+import { useAuth } from './contexts/AuthContext';
 
 const App = () => {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    // Check active sessions when the app loads
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  // Protected Route wrapper component
+  const ProtectedRoute = ({ children }) => {
+    if (!user) {
+      return <Navigate to="/login" replace />;
+    }
+    return <Layout>{children}</Layout>;
+  };
 
   return (
-    <Router>
-      <div className="app">
-        {session ? (
-          <>
-            <Navbar />
-            <div className="main-layout">
-              <Sidebar />
-              <div className="main-content">
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/preferences" element={<UserPreferences />} />
-                  <Route path="/questionnaire" element={<Questionnaire />} />
-                  <Route path="/" element={<Navigate to="/dashboard" />} />
-                  <Route path="/anxietydashboard" element={<AnxietyDashboard />} />
-                  <Route path="*" element={<Navigate to="/dashboard" />} />
-                </Routes>
-              </div>
-            </div>
-          </>
-        ) : (
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<Navigate to="/login" />} />
-          </Routes>
-        )}
-      </div>
-    </Router>
+    <div className="App">
+      <Router>
+        <Routes>
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/preferences"
+            element={
+              <ProtectedRoute>
+                <Preferences />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <ProtectedRoute>
+                <Insights />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resources"
+            element={
+              <ProtectedRoute>
+                <Resources />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </div>
   );
 };
 

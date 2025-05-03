@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FaHome, FaUser, FaChartBar, FaBook, FaCog } from 'react-icons/fa';
 
 const Sidebar = () => {
     const location = useLocation();
@@ -11,54 +12,40 @@ const Sidebar = () => {
                     to="/dashboard" 
                     className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}
                 >
+                    <FaHome />
                     Dashboard
-                </Link>
-                <Link 
-                    to="/anxietydashboard" 
-                    className={`nav-link ${location.pathname === '/anxietydashboard' ? 'active' : ''}`}
-                >
-                    Anxiety Dashboard
                 </Link>
                 <Link 
                     to="/preferences" 
                     className={`nav-link ${location.pathname === '/preferences' ? 'active' : ''}`}
                 >
-                    Preferences
+                    <FaUser />
+                    Profile
+                </Link>
+                <Link 
+                    to="/insights" 
+                    className={`nav-link ${location.pathname === '/insights' ? 'active' : ''}`}
+                >
+                    <FaChartBar />
+                    Insights
+                </Link>
+                <Link 
+                    to="/resources" 
+                    className={`nav-link ${location.pathname === '/resources' ? 'active' : ''}`}
+                >
+                    <FaBook />
+                    Resources
+                </Link>
+                <Link 
+                    to="/settings" 
+                    className={`nav-link ${location.pathname === '/settings' ? 'active' : ''}`}
+                >
+                    <FaCog />
+                    Settings
                 </Link>
             </div>
         </div>
     );
 };
-
-const styles = {
-    sidebar: {
-        backgroundColor: '#dff5c1',
-        height: '100%',
-        padding: '20px 0',
-    },
-    link: {
-        color: '#123522',
-        transition: 'all 0.3s ease',
-        padding: '10px 20px',
-    }
-};
-
-// Add this CSS to your global styles or create a new CSS file
-const cssToAdd = `
-.active-link {
-    background-color: #123522 !important;
-    color: #dff5c1 !important;
-}
-
-.nav-link:hover {
-    background-color: #123522 !important;
-    color: #dff5c1 !important;
-}
-`;
-
-// Add the styles to the document
-const styleSheet = document.createElement("style");
-styleSheet.innerText = cssToAdd;
-document.head.appendChild(styleSheet);
 
 export default Sidebar; 

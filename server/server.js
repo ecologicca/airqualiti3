@@ -1,8 +1,48 @@
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
+
+// Debug environment variables
+console.log('Environment variables loaded:', {
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  HAS_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+});
+
 const cron = require('node-cron');
 const { fetchAndStoreWeatherData, getWeatherDataService } = require('./services/weatherService');
+
+// Retry function with exponential backoff
+const retryWithBackoff = async (fn, retries = 3, delay = 1000) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries === 0) throw error;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retryWithBackoff(fn, retries - 1, delay * 2);
+  }
+};
+
+// Function to fetch and store weather data with logging
+const fetchAndLogWeatherData = async (trigger = 'cron') => {
+  try {
+    console.log(`=== Starting weather data fetch (triggered by: ${trigger}) ===`);
+    console.log('Time:', new Date().toISOString());
+    
+    const data = await retryWithBackoff(() => fetchAndStoreWeatherData());
+    
+    console.log('Fetch successful!');
+    console.log('Cities updated:', data.map(d => d.city).join(', '));
+    console.log('Total records:', data.length);
+    console.log('=== Weather data fetch complete ===\n');
+    return data;
+  } catch (error) {
+    console.error(`!!! ${trigger} fetch failed !!!`);
+    console.error('Time:', new Date().toISOString());
+    console.error('Error:', error);
+    console.error('!!! End of error report !!!\n');
+    throw error;
+  }
+};
 
 const app = express();
 app.use(cors());
@@ -29,9 +69,7 @@ app.get('/dashboard', (req, res) => {
 // Test endpoint to manually trigger weather data fetch
 app.get('/api/test-fetch', async (req, res) => {
   try {
-    console.log('Manual fetch triggered at:', new Date().toISOString());
-    const data = await fetchAndStoreWeatherData();
-    console.log('Fetch successful, cities:', data.map(d => d.city).join(', '));
+    const data = await fetchAndLogWeatherData('manual');
     res.json({ success: true, data });
   } catch (error) {
     console.error('Manual fetch failed:', error);
@@ -39,26 +77,28 @@ app.get('/api/test-fetch', async (req, res) => {
   }
 });
 
-// Schedule data fetching daily at 6 AM
-cron.schedule('0 6 * * *', async () => {
-  try {
-    const now = new Date();
-    console.log('=== Starting daily weather data fetch ===');
-    console.log('Time:', now.toISOString());
-    
-    const data = await fetchAndStoreWeatherData();
-    
-    console.log('Fetch successful!');
-    console.log('Cities updated:', data.map(d => d.city).join(', '));
-    console.log('Total records:', data.length);
-    console.log('=== Weather data fetch complete ===\n');
-  } catch (error) {
-    console.error('!!! Daily cron job failed !!!');
-    console.error('Time:', new Date().toISOString());
-    console.error('Error:', error);
-    console.error('!!! End of error report !!!\n');
-  }
+// Schedule data fetching twice per day
+// At 6 AM and 6 PM
+const cronSchedules = ['0 6 * * *', '0 18 * * *'];
+
+cronSchedules.forEach(schedule => {
+  cron.schedule(schedule, async () => {
+    try {
+      await fetchAndLogWeatherData('cron');
+    } catch (error) {
+      // Error is already logged in fetchAndLogWeatherData
+    }
+  });
 });
+
+// Fetch data immediately when server starts
+setTimeout(async () => {
+  try {
+    await fetchAndLogWeatherData('server-start');
+  } catch (error) {
+    // Error is already logged in fetchAndLogWeatherData
+  }
+}, 5000); // Wait 5 seconds after server start
 
 // Add backfill endpoint
 app.get('/api/backfill', async (req, res) => {

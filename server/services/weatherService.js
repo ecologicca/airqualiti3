@@ -1,6 +1,13 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const AppError = require('../utils/AppError');
+
+// Debug environment variables
+console.log('WeatherService ENV:', {
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  HAS_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+});
 
 // Initialize Supabase client
 const supabase = createClient(
