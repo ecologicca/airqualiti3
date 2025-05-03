@@ -959,16 +959,19 @@ body {
   
   /* User Preferences Styles */
   .preferences-container {
-    max-width: 1200px;
-    margin: 40px auto;
-    padding: 0 20px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 2rem;
   }
   
   .preferences-content {
     background-color: white;
-    padding: 40px;
+    padding: 2rem;
     border-radius: 15px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 800px;
   }
   
   .preferences-title {
@@ -985,21 +988,21 @@ body {
   }
   
   .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 1.5rem;
+    width: 100%;
   }
   
   .form-group {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
   
   .form-group label {
-    color: #666;
-    font-size: 0.9rem;
     font-weight: 500;
+    color: #333;
   }
   
   .form-input,
@@ -1009,61 +1012,42 @@ body {
     border: 1px solid #ddd;
     border-radius: 8px;
     font-size: 1rem;
-    color: #333;
-    background-color: white;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s;
   }
   
   .form-input:focus,
   .form-select:focus {
-    outline: none;
     border-color: #043A24;
-  }
-  
-  .form-input::placeholder {
-    color: #999;
-  }
-  
-  .form-select {
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 1rem;
-    padding-right: 2.5rem;
+    outline: none;
   }
   
   .checkbox-group {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
   }
   
   .checkbox-label {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #333;
     cursor: pointer;
   }
   
   .checkbox-label input[type="checkbox"] {
-    width: 1.25rem;
-    height: 1.25rem;
-    border: 2px solid #043A24;
-    border-radius: 4px;
-    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    margin: 0;
   }
   
   .save-button {
     background-color: #043A24;
     color: white;
+    padding: 1rem;
     border: none;
     border-radius: 8px;
-    padding: 1rem;
     font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s;
     margin-top: 1rem;
     width: 100%;
   }
@@ -1072,18 +1056,17 @@ body {
     background-color: #032918;
   }
   
-  /* Responsive adjustments */
   @media (max-width: 768px) {
     .preferences-container {
-      margin: 20px auto;
+      padding: 1rem;
     }
   
     .preferences-content {
-      padding: 20px;
+      padding: 1.5rem;
     }
   
     .form-row {
-      grid-template-columns: 1fr;
+      flex-direction: column;
       gap: 1rem;
     }
   }
@@ -1127,8 +1110,8 @@ body {
   
   .main-layout {
     display: flex;
-    flex: 1;
     min-height: 100vh;
+    position: relative;
   }
   
   /* Sidebar styles */
@@ -1138,13 +1121,20 @@ body {
     min-height: 100vh;
     padding: 20px 0;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
   
   .nav-content {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 0 20px;
+    padding: 20px;
   }
   
   .nav-link {
@@ -1177,6 +1167,33 @@ body {
     flex: 1;
     padding: 2rem;
     background-color: #f5f5f5;
+  }
+  
+  /* Ensure content area takes remaining space */
+  .dashboard {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  /* Healthy Tip styles */
+  .healthy-tip {
+    padding: 20px;
+    color: #D9F6BB;
+    border-top: 1px solid rgba(217, 246, 187, 0.1);
+    margin-top: auto;
+  }
+  
+  .healthy-tip h2 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #D9F6BB;
+  }
+  
+  .healthy-tip p {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin: 0;
   }
   
   /* Responsive adjustments */
@@ -1318,45 +1335,6 @@ body {
     
     .navbar-logo img {
       height: 32px;
-    }
-  }
-  
-  /* Health Tip */
-  .health-tip {
-    position: fixed;
-    bottom: 2rem;
-    left: 0;
-    width: 250px; /* Match sidebar width */
-    padding: 1.25rem 1.5rem;
-    background-color: rgba(4, 58, 36, 0.95);
-    color: #FFFFFF;
-    border-radius: 0 8px 8px 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    margin-left: 0;
-  }
-  
-  .health-tip h3 {
-    color: #D9F6BB;
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding: 0;
-  }
-  
-  .health-tip p {
-    font-size: 0.9rem;
-    line-height: 1.4;
-    margin: 0;
-    padding: 0;
-  }
-  
-  /* Responsive adjustments for health tip */
-  @media (max-width: 768px) {
-    .health-tip {
-      position: static;
-      width: auto;
-      margin: 1rem;
-      border-radius: 8px;
     }
   }
   

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import PM25Chart from '../../components/charts/PM25Chart';
 import PM10Chart from '../../components/charts/PM10Chart';
+import O3Chart from '../../components/charts/O3Chart';
+import COChart from '../../components/charts/COChart';
 import CityComparisonChart from '../../components/charts/CityComparisonChart';
 import HealthImpactAnalysis from '../../components/HealthImpactAnalysis';
 import '../../styles/style.css';
@@ -59,6 +61,8 @@ const Dashboard = () => {
           ...item,
           'PM 2.5': item.pm25 || item['PM 2.5'],
           'PM 10': item.pm10 || item['PM 10'],
+          'O3': item.o3,
+          'CO': item.co,
           date: new Date(item.created_at || item.date)
         }));
 
@@ -162,29 +166,40 @@ const Dashboard = () => {
         <div className="charts-row">
           <div className="card large chart-card">
             <div className="card-header">
-              <h2 className="card-title">
-                PM 2.5 Levels
-              </h2>
+              <h2 className="card-title">PM 2.5 Levels</h2>
             </div>
             <PM25Chart data={data} userPreferences={userPreferences} />
           </div>
 
           <div className="card large chart-card">
             <div className="card-header">
-              <h2 className="card-title">
-                PM 10 Levels
-              </h2>
+              <h2 className="card-title">PM 10 Levels</h2>
             </div>
             <PM10Chart data={data} userPreferences={userPreferences} />
+          </div>
+        </div>
+
+        {/* O3 and CO Charts Row */}
+        <div className="charts-row">
+          <div className="card large chart-card">
+            <div className="card-header">
+              <h2 className="card-title">Ozone (O₃) Levels</h2>
+            </div>
+            <O3Chart data={data} userPreferences={userPreferences} />
+          </div>
+
+          <div className="card large chart-card">
+            <div className="card-header">
+              <h2 className="card-title">Carbon Monoxide (CO) Levels</h2>
+            </div>
+            <COChart data={data} userPreferences={userPreferences} />
           </div>
         </div>
 
         {/* City Comparison */}
         <div className="card large chart-card">
           <div className="card-header">
-            <h2 className="card-title">
-              City Air Quality Comparison
-            </h2>
+            <h2 className="card-title">City Air Quality Comparison</h2>
           </div>
           <CityComparisonChart userPreferences={userPreferences} />
         </div>

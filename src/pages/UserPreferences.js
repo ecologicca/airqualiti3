@@ -111,7 +111,7 @@ const UserPreferences = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div className="preferences-container"><div className="preferences-content">Loading...</div></div>;
   }
 
   return (

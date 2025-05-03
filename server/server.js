@@ -1,162 +1,191 @@
-require('dotenv').config({ path: __dirname + '/.env' });
+const path = require('path');
+const envPath = path.resolve(__dirname, '.env');
+console.log('Loading .env file from:', envPath);
+require('dotenv').config({ path: envPath });
+
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const cron = require('node-cron');
+const { supabase } = require('./db/database');
+const { manualFetch } = require('./services/dataFetcher');
+const { requireBetaAccess, registerBetaUser } = require('./utils/auth');
 
 // Debug environment variables
 console.log('Environment variables loaded:', {
   SUPABASE_URL: process.env.SUPABASE_URL,
-  HAS_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  HAS_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  HAS_WAQI_KEY: !!process.env.WAQI_API_TOKEN,
+  HAS_BETA_CODE: !!process.env.BETA_INVITE_CODE
 });
 
-const cron = require('node-cron');
-const { fetchAndStoreWeatherData, getWeatherDataService } = require('./services/weatherService');
+// Create logs directory if it doesn't exist
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
 
-// Retry function with exponential backoff
-const retryWithBackoff = async (fn, retries = 3, delay = 1000) => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries === 0) throw error;
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return retryWithBackoff(fn, retries - 1, delay * 2);
-  }
+// Function to log to file
+const logToFile = (message) => {
+  const date = new Date().toISOString().split('T')[0];
+  const logFile = path.join(logsDir, `cron-${date}.log`);
+  const timestamp = new Date().toISOString();
+  const logMessage = `${timestamp}: ${message}\n`;
+  
+  fs.appendFileSync(logFile, logMessage);
+  console.log(message); // Also log to console
 };
+
+// Track last fetch time to prevent duplicate calls
+let lastFetchTime = 0;
+const MINIMUM_FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 // Function to fetch and store weather data with logging
 const fetchAndLogWeatherData = async (trigger = 'cron') => {
+  const now = Date.now();
+  
+  // Prevent fetching if it's been less than 5 minutes since last fetch
+  if (now - lastFetchTime < MINIMUM_FETCH_INTERVAL) {
+    logToFile(`Skipping fetch - last fetch was ${Math.round((now - lastFetchTime) / 1000)} seconds ago`);
+    return;
+  }
+  
   try {
-    console.log(`=== Starting weather data fetch (triggered by: ${trigger}) ===`);
-    console.log('Time:', new Date().toISOString());
+    logToFile(`=== Starting weather data fetch (triggered by: ${trigger}) ===`);
+    lastFetchTime = now;
     
-    const data = await retryWithBackoff(() => fetchAndStoreWeatherData());
+    const result = await manualFetch();
     
-    console.log('Fetch successful!');
-    console.log('Cities updated:', data.map(d => d.city).join(', '));
-    console.log('Total records:', data.length);
-    console.log('=== Weather data fetch complete ===\n');
-    return data;
+    if (result.success) {
+      logToFile('Fetch successful!');
+      logToFile('Cities updated: ' + result.cities.join(', '));
+      logToFile('=== Weather data fetch complete ===\n');
+      return result;
+    } else {
+      throw new Error(result.error);
+    }
   } catch (error) {
-    console.error(`!!! ${trigger} fetch failed !!!`);
-    console.error('Time:', new Date().toISOString());
-    console.error('Error:', error);
-    console.error('!!! End of error report !!!\n');
+    logToFile(`!!! ${trigger} fetch failed !!!`);
+    logToFile('Error: ' + error.message);
+    logToFile('!!! End of error report !!!\n');
     throw error;
   }
 };
 
 const app = express();
-app.use(cors());
+
+// CORS configuration
+const allowedOrigins = [
+    'http://localhost:3000',  // Development
+    'http://localhost:3001',  // Development alternative port
+    process.env.FRONTEND_URL, // Production frontend URL (set this in Render env vars once you have it)
+];
+
+app.use(cors({
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true // Allow credentials (cookies, authorization headers, etc.)
+}));
+
 app.use(express.json());
 
-// Define the getWeatherData handler
-const getWeatherData = async (req, res) => {
+// Health check endpoint for Render
+app.get('/app-health', (req, res) => {
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Beta registration endpoint
+app.post('/api/beta/register', async (req, res) => {
+  try {
+    const { email, inviteCode } = req.body;
+    
+    if (!email || !inviteCode) {
+      return res.status(400).json({
+        error: 'Email and invite code are required'
+      });
+    }
+
+    const result = await registerBetaUser(email, inviteCode);
+    res.json(result);
+  } catch (error) {
+    res.status(401).json({
+      error: error.message
+    });
+  }
+});
+
+// Protected API Routes - require beta access
+app.use('/api/data', requireBetaAccess);
+app.use('/api/test-fetch', requireBetaAccess);
+
+// API Routes
+app.get('/api/data', async (req, res) => {
   try {
     const { city, days = 7, metrics = ['pm25', 'pm10', 'temp', 'created_at'] } = req.query;
-    const data = await getWeatherDataService({ city, days: parseInt(days), metrics });
+    const { data, error } = await supabase
+      .from('weather_data')
+      .select(metrics.join(','))
+      .eq('city', city)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(days));
+
+    if (error) throw error;
     res.json(data);
   } catch (error) {
     console.error('Error fetching weather data:', error);
     res.status(500).json({ error: error.message });
   }
-};
-
-// API Routes
-app.get('/api/data', getWeatherData);
-app.get('/dashboard', (req, res) => {
-    res.send('Dashboard API is working');
 });
 
 // Test endpoint to manually trigger weather data fetch
 app.get('/api/test-fetch', async (req, res) => {
   try {
     const data = await fetchAndLogWeatherData('manual');
-    res.json({ success: true, data });
+    res.json(data);
   } catch (error) {
     console.error('Manual fetch failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Schedule data fetching twice per day
-// At 6 AM and 6 PM
+// Schedule data fetching twice per day at 6 AM and 6 PM UTC
 const cronSchedules = ['0 6 * * *', '0 18 * * *'];
 
 cronSchedules.forEach(schedule => {
   cron.schedule(schedule, async () => {
     try {
+      logToFile(`Cron job started (Schedule: ${schedule})`);
       await fetchAndLogWeatherData('cron');
     } catch (error) {
       // Error is already logged in fetchAndLogWeatherData
     }
+  }, {
+    timezone: 'UTC' // Explicitly set timezone to UTC
   });
 });
 
-// Fetch data immediately when server starts
+// Wait 30 seconds before initial fetch to ensure everything is properly initialized
 setTimeout(async () => {
   try {
     await fetchAndLogWeatherData('server-start');
   } catch (error) {
     // Error is already logged in fetchAndLogWeatherData
   }
-}, 5000); // Wait 5 seconds after server start
-
-// Add backfill endpoint
-app.get('/api/backfill', async (req, res) => {
-  try {
-    console.log('Starting data backfill...');
-    const startDate = new Date('2024-02-28'); // Last data point
-    const endDate = new Date();
-    const dates = [];
-    
-    // Generate array of missing dates
-    let currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate.setHours(currentDate.getHours() + 8); // 3 times per day
-    }
-
-    console.log(`Attempting to backfill ${dates.length} data points`);
-    
-    // Process in batches to avoid rate limits
-    const batchSize = 5;
-    const results = [];
-    
-    for (let i = 0; i < dates.length; i += batchSize) {
-      const batch = dates.slice(i, i + batchSize);
-      console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(dates.length/batchSize)}`);
-      
-      const batchData = await fetchAndStoreWeatherData();
-      results.push(...batchData);
-      
-      // Wait 2 seconds between batches to respect API rate limits
-      if (i + batchSize < dates.length) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-
-    console.log('Backfill complete!');
-    res.json({ 
-      success: true, 
-      totalPoints: results.length,
-      dateRange: {
-        from: startDate,
-        to: endDate
-      }
-    });
-  } catch (error) {
-    console.error('Backfill failed:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-});
+}, 30000); // 30 second delay
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log('Cron schedule: Daily at 6:00 AM');
+  logToFile(`Server running on port ${PORT}`);
+  logToFile('Cron schedules (UTC):');
+  cronSchedules.forEach(schedule => {
+    logToFile(`- ${schedule}`);
+  });
 }); 

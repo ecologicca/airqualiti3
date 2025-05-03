@@ -44,6 +44,10 @@ const Sidebar = () => {
                     Settings
                 </Link>
             </div>
+            <div className="healthy-tip">
+                <h2>Healthy Tip</h2>
+                <p>Use carbon monoxide detectors on every floor of your home.</p>
+            </div>
         </div>
     );
 };
