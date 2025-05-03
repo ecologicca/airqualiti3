@@ -78,7 +78,8 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:3000',  // Development
     'http://localhost:3001',  // Development alternative port
-    process.env.FRONTEND_URL, // Production frontend URL (set this in Render env vars once you have it)
+    'https://airqualiti3.onrender.com', // Your Render domain
+    process.env.FRONTEND_URL, // Production frontend URL (if different)
 ];
 
 app.use(cors({
@@ -87,6 +88,7 @@ app.use(cors({
         if (!origin) return callback(null, true);
         
         if (allowedOrigins.indexOf(origin) === -1) {
+            console.log('Blocked origin:', origin); // Debug logging
             const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
             return callback(new Error(msg), false);
         }
@@ -96,6 +98,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, '../build')));
 
 // Health check endpoint for Render
 app.get('/app-health', (req, res) => {
@@ -156,6 +161,15 @@ app.get('/api/test-fetch', async (req, res) => {
   }
 });
 
+// Handle React routing, return all requests to React app
+app.get('*', function(req, res) {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+        return;
+    }
+    res.sendFile(path.join(__dirname, '../build', 'index.html'));
+});
+
 // Schedule data fetching twice per day at 6 AM and 6 PM UTC
 const cronSchedules = ['0 6 * * *', '0 18 * * *'];
 
@@ -188,4 +202,4 @@ app.listen(PORT, () => {
   cronSchedules.forEach(schedule => {
     logToFile(`- ${schedule}`);
   });
-}); 
+});
