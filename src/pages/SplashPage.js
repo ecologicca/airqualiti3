@@ -10,19 +10,16 @@ const SplashPage = () => {
 
   const VALID_BETA_CODE = 'BREATHE-ACCESS-5016';
 
-  const verifyBetaCode = async (e) => {
+  const verifyBetaCode = (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      // Simple direct comparison with the valid beta code
       if (betaCode.trim() === VALID_BETA_CODE) {
-        // Store the beta access in local storage
         localStorage.setItem('betaAccess', 'true');
         
-        // Navigate to login page
-        navigate('/login');
+        window.location.replace('/login');
       } else {
         setError('Invalid beta code. Please try again.');
       }
@@ -37,21 +34,25 @@ const SplashPage = () => {
   return (
     <div className="splash-container">
       <div className="splash-content">
-        <img src={logo} alt="AirQualiti" className="splash-logo" />
-        <h1>Welcome to AirQualiti Beta</h1>
-        <p>Enter your beta invite code to access the application</p>
+        <h2 className="splash-logo-text">ecologicca</h2>
+        <h1 className="splash-title">Welcome to AirQualiti Beta</h1>
+        <p className="splash-subtitle">Enter your beta invite code to access the application</p>
         
         <form onSubmit={verifyBetaCode} className="beta-code-form">
           <input
             type="text"
             value={betaCode}
             onChange={(e) => setBetaCode(e.target.value.toUpperCase())}
-            placeholder="Enter your beta code"
+            placeholder="ENTER YOUR BETA CODE"
             className="beta-code-input"
             required
           />
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading} className="beta-submit-button">
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="beta-submit-button"
+          >
             {loading ? 'Verifying...' : 'Enter App'}
           </button>
         </form>

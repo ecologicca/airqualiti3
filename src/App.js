@@ -22,158 +22,93 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions when the app loads
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
+    // Only check session if we have beta access
+    if (localStorage.getItem('betaAccess') === 'true') {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setLoading(false);
+      });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {
     return <div>Loading...</div>;
   }
 
+  // Check for beta access first
+  const hasBetaAccess = localStorage.getItem('betaAccess') === 'true';
+
   return (
     <Router>
       <div className="app">
         <Routes>
+          {/* Show splash page if no beta access */}
           <Route
             path="/"
             element={
-              localStorage.getItem('betaAccess') === 'true' ? (
+              hasBetaAccess ? (
                 <Navigate to={session ? '/dashboard' : '/login'} />
               ) : (
                 <SplashPage />
               )
             }
           />
-          {localStorage.getItem('betaAccess') === 'true' ? (
+          
+          {/* Public routes (only accessible with beta access) */}
+          {hasBetaAccess && (
             <>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              {session ? (
-                <>
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <Dashboard />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/insights"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <Insights />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/resources"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <Resources />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <Settings />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/preferences"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <UserPreferences />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/questionnaire"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <Questionnaire />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                  <Route
-                    path="/anxietydashboard"
-                    element={
-                      <>
-                        <Navbar />
-                        <div className="main-layout">
-                          <Sidebar />
-                          <div className="main-content">
-                            <AnxietyDashboard />
-                          </div>
-                        </div>
-                      </>
-                    }
-                  />
-                </>
-              ) : (
-                <Route path="*" element={<Navigate to="/login" />} />
-              )}
+            </>
+          )}
+
+          {/* Protected routes (require both beta access and session) */}
+          {hasBetaAccess && session ? (
+            <>
+              <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+              <Route path="/insights" element={<Layout><Insights /></Layout>} />
+              <Route path="/resources" element={<Layout><Resources /></Layout>} />
+              <Route path="/settings" element={<Layout><Settings /></Layout>} />
+              <Route path="/preferences" element={<Layout><UserPreferences /></Layout>} />
+              <Route path="/questionnaire" element={<Layout><Questionnaire /></Layout>} />
+              <Route path="/anxietydashboard" element={<Layout><AnxietyDashboard /></Layout>} />
             </>
           ) : (
-            <Route path="*" element={<Navigate to="/" />} />
+            // Redirect to login or splash page depending on beta access
+            <Route 
+              path="*" 
+              element={<Navigate to={hasBetaAccess ? '/login' : '/'} />} 
+            />
           )}
         </Routes>
       </div>
     </Router>
   );
 };
+
+// Layout component to avoid repetition
+const Layout = ({ children }) => (
+  <>
+    <Navbar />
+    <div className="main-layout">
+      <Sidebar />
+      <div className="main-content">
+        {children}
+      </div>
+    </div>
+  </>
+);
 
 export default App;
