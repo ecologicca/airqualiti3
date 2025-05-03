@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import './styles.css';
 
 const ResetPassword = () => {
-  const [email, setEnomail] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
