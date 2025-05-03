@@ -76,18 +76,41 @@ async function storeDataInSupabase(data) {
 // Function to manually trigger data fetch (for testing)
 async function manualFetch() {
     try {
+        console.log('Starting data fetch...');
+        
         const cities = await getCities();
+        console.log('Found cities:', cities);
+        
         const dataPromises = cities.map(city => fetchAirQualityData(city));
         const cityData = await Promise.all(dataPromises);
+        console.log('Fetched data:', cityData);
+        
         await storeDataInSupabase(cityData);
+        console.log('Successfully stored data in Supabase');
+        
         return { 
             success: true, 
             message: 'Data fetch completed',
             cities: cities
         };
     } catch (error) {
+        console.error('Error in manualFetch:', error);
         return { success: false, error: error.message };
     }
+}
+
+// Add this to make the script runnable directly
+if (require.main === module) {
+    console.log('Running data fetcher directly...');
+    manualFetch()
+        .then(result => {
+            console.log('Fetch result:', result);
+            process.exit(0);
+        })
+        .catch(error => {
+            console.error('Fatal error:', error);
+            process.exit(1);
+        });
 }
 
 module.exports = {
