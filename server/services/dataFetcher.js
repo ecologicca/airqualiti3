@@ -6,30 +6,38 @@ const AppError = require('../utils/AppError');
 async function getCities() {
     const { data, error } = await supabase
         .from('user_preferences')
-        .select('city')
-        .distinct();
+        .select('city', { count: 'exact', head: false })
+        .is('city', 'not.null');
     
     if (error) {
         throw new AppError('Failed to fetch cities', 500);
     }
     
-    return data.map(item => item.city);
+    // Get unique cities using Set
+    const uniqueCities = [...new Set(data.map(item => item.city))];
+    return uniqueCities;
 }
 
 async function fetchAirQualityData(city) {
     try {
+        // Add delay between requests to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const response = await fetch(
             `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
         );
         
         if (response.status === 429) {
-            throw new AppError('WAQI API rate limit exceeded', 429);
+            // Wait longer if we hit rate limit
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            throw new AppError('WAQI API rate limit exceeded, retrying after delay', 429);
         }
         
         const data = await response.json();
         
         if (data.status !== 'ok') {
             if (data.data === 'Over quota') {
+                logToFile('WAQI API quota exceeded, will retry next hour');
                 throw new AppError('WAQI API quota exceeded', 429);
             }
             throw new Error(`Failed to fetch data for ${city}: ${data.data}`);
@@ -37,11 +45,13 @@ async function fetchAirQualityData(city) {
 
         return {
             city,
-            pm25: data.data.iaqi.pm25?.v || null,
-            pm10: data.data.iaqi.pm10?.v || null,
-            temp: data.data.iaqi.t?.v?.toString() || null,
-            created_at: new Date().toISOString(),
-            air_quality: data.data.aqi?.toString() || null
+            pm25: parseFloat(data.data.iaqi.pm25?.v) || null,
+            pm10: parseFloat(data.data.iaqi.pm10?.v) || null,
+            temp: parseFloat(data.data.iaqi.t?.v) || null,
+            co: parseFloat(data.data.iaqi.co?.v) || null,    // float8
+            o3: parseFloat(data.data.iaqi.o3?.v) || null,    // float8
+            aqi: parseInt(data.data.aqi) || null,            // int2
+            created_at: new Date().toISOString()
         };
     } catch (error) {
         if (error instanceof AppError) {
