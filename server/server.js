@@ -1,12 +1,54 @@
-require('dotenv').config();
+const path = require('path');
+const envPath = path.resolve(__dirname, '.env');
+console.log('Loading .env file from:', envPath);
+require('dotenv').config({ path: envPath });
+
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const cron = require('node-cron');
 const { fetchAndStoreWeatherData, getWeatherDataService } = require('./services/weatherService');
+const { supabase } = require('./db/database');
+const { manualFetch } = require('./services/dataFetcher');
 
 const app = express();
-app.use(cors());
+
+// CORS configuration
+const allowedOrigins = [
+    'http://localhost:3000',  // Development
+    'http://localhost:3001',  // Development alternative port
+    'https://airqualiti3.onrender.com', // Your Render domain
+    process.env.FRONTEND_URL, // Production frontend URL (if different)
+];
+
+app.use(cors({
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            console.log('Blocked origin:', origin); // Debug logging
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true // Allow credentials (cookies, authorization headers, etc.)
+}));
+
 app.use(express.json());
+
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, '../build')));
+
+// Handle React routing, return all requests to React app
+app.get('*', function(req, res) {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+        return;
+    }
+    res.sendFile(path.join(__dirname, '../build', 'index.html'));
+});
 
 // Define the getWeatherData handler
 const getWeatherData = async (req, res) => {
