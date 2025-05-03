@@ -13,6 +13,8 @@ import {
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { supabase } from '../../supabaseClient';
+import ChartLegend from './ChartLegend';
+import { calculateIndoorWithDevices } from '../../utils/airQualityCalculations';
 
 ChartJS.register(
   CategoryScale,
@@ -31,37 +33,16 @@ const calculateAnxietyFromPM25 = (pm25Value, baseAnxiety) => {
   return Math.min(10, baseAnxiety + increase); // Cap at 10
 };
 
-const calculateEcologicaAnxiety = (pm25Value, baseAnxiety) => {
-  // First reduce PM2.5 by 50% with Ecologica, then calculate anxiety
-  const reducedPM25 = pm25Value * 0.5;
-  return calculateAnxietyFromPM25(reducedPM25, baseAnxiety);
-};
-
-const DatasetToggle = ({ name, isActive, onToggle, color }) => (
-  <div style={{ display: 'flex', alignItems: 'center', margin: '5px 0' }}>
-    <button
-      onClick={() => onToggle(name)}
-      style={{
-        width: '20px',
-        height: '20px',
-        borderRadius: '50%',
-        border: `2px solid ${color}`,
-        backgroundColor: isActive ? color : 'white',
-        cursor: 'pointer',
-        marginRight: '8px',
-        padding: 0
-      }}
-    />
-    <span style={{ fontSize: '0.9rem' }}>{name}</span>
-  </div>
-);
-
 const AnxietyChart = ({ userPreferences }) => {
   const [chartData, setChartData] = useState(null);
   const [anxietyData, setAnxietyData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showEcologica, setShowEcologica] = useState(userPreferences.hasEcologica);
+  const [activeDatasets, setActiveDatasets] = useState({
+    'Outdoor': true,
+    'Indoor': true
+  });
+  const [showAirPurifier, setShowAirPurifier] = useState(userPreferences?.hasAirPurifier || false);
   const baseAnxiety = userPreferences.anxiety_base_level || 3;
 
   useEffect(() => {
@@ -87,23 +68,42 @@ const AnxietyChart = ({ userPreferences }) => {
                 x: new Date(item.created_at),
                 y: calculateAnxietyFromPM25(item.pm25, baseAnxiety)
               })),
-              borderColor: 'rgb(0, 100, 0)',
-              backgroundColor: 'rgba(0, 100, 0, 0.1)',
+              borderColor: '#043A24',
+              backgroundColor: 'rgba(4, 58, 36, 0.1)',
               borderWidth: 2,
-              tension: 0.1
+              tension: 0.1,
+              hidden: !activeDatasets['Outdoor']
+            },
+            {
+              label: 'Indoor',
+              data: data.map(item => ({
+                x: new Date(item.created_at),
+                y: calculateAnxietyFromPM25(
+                  calculateIndoorWithDevices(item.pm25, userPreferences?.has_HVAC || false, false),
+                  baseAnxiety
+                )
+              })),
+              borderColor: '#D9F6BB',
+              backgroundColor: 'rgba(217, 246, 187, 0.1)',
+              borderWidth: 2,
+              tension: 0.1,
+              hidden: !activeDatasets['Indoor']
             }
           ]
         };
 
-        if (showEcologica) {
+        if (showAirPurifier) {
           formattedData.datasets.push({
-            label: 'With Ecologica',
+            label: 'With Air Purifier',
             data: data.map(item => ({
               x: new Date(item.created_at),
-              y: calculateEcologicaAnxiety(item.pm25, baseAnxiety)
+              y: calculateAnxietyFromPM25(
+                calculateIndoorWithDevices(item.pm25, userPreferences?.has_HVAC || false, true),
+                baseAnxiety
+              )
             })),
-            borderColor: 'rgb(100, 149, 237)',
-            backgroundColor: 'rgba(100, 149, 237, 0.1)',
+            borderColor: '#A9ED8A',
+            backgroundColor: 'rgba(169, 237, 138, 0.1)',
             borderWidth: 2,
             tension: 0.1
           });
@@ -121,7 +121,7 @@ const AnxietyChart = ({ userPreferences }) => {
     if (userPreferences.city) {
       fetchData();
     }
-  }, [userPreferences, showEcologica, baseAnxiety]);
+  }, [userPreferences, showAirPurifier, activeDatasets, baseAnxiety]);
 
   const calculatePeakLevel = (data) => {
     if (!data || !data.length) return baseAnxiety;
@@ -185,27 +185,21 @@ const AnxietyChart = ({ userPreferences }) => {
           <div style={{ height: '400px', width: '100%' }}>
             <Line data={chartData} options={options} />
           </div>
-          <div style={{ 
-            marginTop: '20px',
-            display: 'flex',
-            gap: '20px',
-            justifyContent: 'center'
-          }}>
-            <DatasetToggle 
-              name="Outdoor" 
-              isActive={true}
-              onToggle={() => {}}
-              color="rgb(0, 100, 0)"
-            />
-            {userPreferences.hasEcologica && (
-              <DatasetToggle 
-                name="With Ecologica" 
-                isActive={showEcologica} 
-                onToggle={() => setShowEcologica(!showEcologica)}
-                color="rgb(100, 149, 237)"
-              />
-            )}
-          </div>
+          <ChartLegend 
+            activeDatasets={{
+              'Outdoor': activeDatasets['Outdoor'],
+              'Indoor': activeDatasets['Indoor'],
+              'With Air Purifier': showAirPurifier
+            }}
+            onToggle={(label) => {
+              if (label === 'With Air Purifier') {
+                setShowAirPurifier(!showAirPurifier);
+              } else {
+                setActiveDatasets(prev => ({...prev, [label]: !prev[label]}));
+              }
+            }}
+            showAirPurifier={userPreferences?.hasAirPurifier}
+          />
         </div>
         
         <div className="data-side">

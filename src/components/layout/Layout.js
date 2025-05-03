@@ -4,9 +4,9 @@ import Sidebar from './Sidebar';
 
 const Layout = ({ children, city, onCityChange }) => {
     return (
-        <div className="layout">
+        <div className="app-container">
             <TopNavbar city={city} onCityChange={onCityChange} />
-            <div className="content-wrapper">
+            <div className="main-layout">
                 <Sidebar />
                 <main className="main-content">
                     {children}

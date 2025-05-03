@@ -27,7 +27,7 @@ ChartJS.register(
 const AnxietyDashboard = () => {
   const [userPreferences, setUserPreferences] = useState({
     hasHVAC: false,
-    hasEcologica: false,
+    hasBlueair: false,
     city: 'Toronto',
     firstName: '',
     anxietyLevel: 5
@@ -52,7 +52,7 @@ const AnxietyDashboard = () => {
         if (data) {
           setUserPreferences({
             hasHVAC: data.has_HVAC || false,
-            hasEcologica: data.has_ecologgica || false,
+            hasBlueair: data.has_ecologgica || false,
             city: data.city || 'Toronto',
             firstName: data.first_name || '',
             anxietyLevel: data.anxiety_base_level || 5
