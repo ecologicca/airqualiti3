@@ -129,9 +129,7 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '1rem',
-    ':hover': {
-      backgroundColor: '#1a4d33',
-    },
+    transition: 'background-color 0.2s ease',
   },
 };
 

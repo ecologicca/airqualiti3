@@ -21,22 +21,32 @@ async function fetchAirQualityData(city) {
         const response = await fetch(
             `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
         );
+        
+        if (response.status === 429) {
+            throw new AppError('WAQI API rate limit exceeded', 429);
+        }
+        
         const data = await response.json();
         
         if (data.status !== 'ok') {
-            throw new Error(`Failed to fetch data for ${city}`);
+            if (data.data === 'Over quota') {
+                throw new AppError('WAQI API quota exceeded', 429);
+            }
+            throw new Error(`Failed to fetch data for ${city}: ${data.data}`);
         }
 
-        // Match your existing schema
         return {
             city,
             pm25: data.data.iaqi.pm25?.v || null,
             pm10: data.data.iaqi.pm10?.v || null,
-            temp: data.data.iaqi.t?.v?.toString() || null, // stored as text in your schema
+            temp: data.data.iaqi.t?.v?.toString() || null,
             created_at: new Date().toISOString(),
-            air_quality: data.data.aqi?.toString() || null // stored as text
+            air_quality: data.data.aqi?.toString() || null
         };
     } catch (error) {
+        if (error instanceof AppError) {
+            throw error;
+        }
         console.error(`Error fetching data for ${city}:`, error);
         throw new AppError(`Failed to fetch data for ${city}`, 500);
     }
@@ -52,28 +62,6 @@ async function storeDataInSupabase(data) {
         throw new AppError('Failed to store data in database', 500);
     }
 }
-
-// Schedule daily data fetch at midnight
-cron.schedule('0 0 * * *', async () => {
-    console.log('Starting daily data fetch...');
-    
-    try {
-        // Get cities from database
-        const cities = await getCities();
-        console.log('Fetching data for cities:', cities);
-
-        // Fetch data for all cities
-        const dataPromises = cities.map(city => fetchAirQualityData(city));
-        const cityData = await Promise.all(dataPromises);
-        
-        // Store all data in Supabase
-        await storeDataInSupabase(cityData);
-        
-        console.log('Daily data fetch completed successfully');
-    } catch (error) {
-        console.error('Error in daily data fetch:', error);
-    }
-});
 
 // Function to manually trigger data fetch (for testing)
 async function manualFetch() {

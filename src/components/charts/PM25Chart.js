@@ -1,165 +1,174 @@
 import React, { useState, useEffect } from 'react';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
   TimeScale
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { supabase } from '../../supabaseClient';
+import ChartLegend from './ChartLegend';
+import { calculateIndoorWithDevices } from '../../utils/airQualityCalculations';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
   TimeScale
 );
 
-const calculateIndoorReduction = (value) => {
-  return value * 0.7; // 30% reduction for indoor air quality
+// Utility functions
+const aggregateDataByDay = (data) => {
+  const aggregated = {};
+  
+  data.forEach(item => {
+    const date = new Date(item.date);
+    const dateKey = date.toISOString().split('T')[0];
+    
+    if (!aggregated[dateKey]) {
+      aggregated[dateKey] = {
+        sum: 0,
+        count: 0,
+        date: date
+      };
+    }
+    
+    if (item['PM 2.5']) {
+      aggregated[dateKey].sum += item['PM 2.5'];
+      aggregated[dateKey].count += 1;
+    }
+  });
+  
+  return Object.values(aggregated).map(item => ({
+    date: item.date,
+    'PM 2.5': item.count > 0 ? item.sum / item.count : null
+  }));
 };
 
-const calculateEcologicaReduction = (value) => {
-  return value * 0.6; // 40% reduction
-};
-
-const calculateCombinedReduction = (value) => {
-  return value * 0.5; // 50% reduction
-};
-
-const calculateImpact = (value, hasEcologica) => {
-  const indoorValue = calculateIndoorReduction(value);
-  if (hasEcologica) {
-    return calculateCombinedReduction(value);
-  }
-  return indoorValue;
-};
-
-const DatasetToggle = ({ name, isActive, onToggle, color }) => (
-  <div style={{ display: 'flex', alignItems: 'center', margin: '5px 0' }}>
-    <button
-      onClick={() => onToggle(name)}
-      style={{
-        width: '20px',
-        height: '20px',
-        borderRadius: '50%',
-        border: `2px solid ${color}`,
-        backgroundColor: isActive ? color : 'white',
-        cursor: 'pointer',
-        marginRight: '8px',
-        padding: 0
-      }}
-    />
-    <span style={{ fontSize: '0.9rem' }}>{name}</span>
-  </div>
-);
-
-const PM25Chart = ({ userPreferences }) => {
+const PM25Chart = ({ data, userPreferences }) => {
   const [chartData, setChartData] = useState(null);
-  const [weatherData, setWeatherData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeDatasets, setActiveDatasets] = useState({
     'Outdoor': true,
-    'Indoor': true
+    'Indoor': true,
+    'HVAC': false,
+    'Air Purifier': false
   });
-  const [showEcologica, setShowEcologica] = useState(userPreferences.hasEcologica);
-
-  const toggleDataset = (name) => {
-    setActiveDatasets(prev => ({
-      ...prev,
-      [name]: !prev[name]
-    }));
-  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data, error: dataError } = await supabase
-          .from('weather_data')
-          .select('*')
-          .eq('city', userPreferences.city)
-          .order('created_at', { ascending: false })
-          .limit(30);
-
-        if (dataError) throw dataError;
-
-        setWeatherData(data);
-
-        const formattedData = {
-          labels: data.map(item => new Date(item.created_at)),
-          datasets: []
-        };
-
-        // Add With Ecologica (bottom layer)
-        if (showEcologica) {
-          formattedData.datasets.push({
-            label: 'With Ecologica',
-            data: data.map(item => calculateCombinedReduction(item.pm25)),
-            backgroundColor: 'rgba(100, 149, 237, 0.9)',
-            hidden: false,
-            stack: 'stack1',
-            barThickness: 18
-          });
-        }
-
-        // Add Indoor (middle layer)
-        formattedData.datasets.push({
-          label: 'Indoor',
-          data: data.map(item => calculateIndoorReduction(item.pm25)),
-          backgroundColor: 'rgba(144, 238, 144, 0.9)',
-          hidden: !activeDatasets['Indoor'],
-          stack: 'stack1',
-          barThickness: 18
-        });
-
-        // Add Outdoor (top layer)
-        formattedData.datasets.push({
-          label: 'Outdoor',
-          data: data.map(item => item.pm25),
-          backgroundColor: 'rgba(0, 100, 0, 0.9)',
-          hidden: !activeDatasets['Outdoor'],
-          stack: 'stack1',
-          barThickness: 18
-        });
-
-        setChartData(formattedData);
-      } catch (err) {
-        console.error('Error fetching PM2.5 data:', err);
-        setError('Failed to load PM2.5 data');
-      } finally {
+    try {
+      if (!data || data.length === 0) {
+        setError('No data available');
         setIsLoading(false);
+        return;
       }
-    };
 
-    if (userPreferences.city) {
-      fetchData();
+      // Aggregate the data by day
+      const aggregatedData = aggregateDataByDay(data);
+
+      const formattedData = {
+        labels: aggregatedData.map(item => new Date(item.date)),
+        datasets: [
+          {
+            label: 'Outdoor',
+            data: aggregatedData.map(item => ({
+              x: new Date(item.date),
+              y: item['PM 2.5']
+            })),
+            borderColor: '#043A24',
+            backgroundColor: 'rgba(4, 58, 36, 0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            hidden: !activeDatasets['Outdoor']
+          },
+          {
+            label: 'Indoor',
+            data: aggregatedData.map(item => ({
+              x: new Date(item.date),
+              y: item['PM 2.5'] ? calculateIndoorWithDevices(
+                item['PM 2.5'],
+                false,
+                false
+              ) : null
+            })),
+            borderColor: '#D9F6BB',
+            backgroundColor: 'rgba(217, 246, 187, 0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            hidden: !activeDatasets['Indoor']
+          }
+        ]
+      };
+
+      // Add HVAC dataset if available
+      if (userPreferences?.has_HVAC) {
+        formattedData.datasets.push({
+          label: 'HVAC',
+          data: aggregatedData.map(item => ({
+            x: new Date(item.date),
+            y: item['PM 2.5'] ? calculateIndoorWithDevices(
+              item['PM 2.5'],
+              true,
+              false
+            ) : null
+          })),
+          borderColor: '#A9ED8A',
+          backgroundColor: 'rgba(169, 237, 138, 0.1)',
+          borderWidth: 2,
+          tension: 0.1,
+          hidden: !activeDatasets['HVAC']
+        });
+      }
+
+      // Add Air Purifier dataset if available
+      if (userPreferences?.has_ecologgica) {
+        formattedData.datasets.push({
+          label: 'Air Purifier',
+          data: aggregatedData.map(item => ({
+            x: new Date(item.date),
+            y: item['PM 2.5'] ? calculateIndoorWithDevices(
+              item['PM 2.5'],
+              false,
+              true
+            ) : null
+          })),
+          borderColor: '#7FD663',
+          backgroundColor: 'rgba(127, 214, 99, 0.1)',
+          borderWidth: 2,
+          tension: 0.1,
+          hidden: !activeDatasets['Air Purifier']
+        });
+      }
+
+      setChartData(formattedData);
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Error processing PM2.5 data:', err);
+      setError('Failed to process PM2.5 data');
+      setIsLoading(false);
     }
-  }, [userPreferences, showEcologica, activeDatasets]);
-
-  const calculateDaysOverThreshold = (data, threshold) => {
-    if (!data || !data.length) return 0;
-    return data.filter(day => parseFloat(day.pm25) > threshold).length;
-  };
+  }, [data, userPreferences, activeDatasets]);
 
   if (isLoading) return <div>Loading PM2.5 data...</div>;
   if (error) return <div>Error: {error}</div>;
-  if (!chartData || !weatherData.length) return <div>No PM2.5 data available</div>;
+  if (!chartData || !data.length) return <div>No PM2.5 data available</div>;
 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       x: {
-        stacked: true,
         type: 'time',
         time: {
           unit: 'day',
@@ -173,7 +182,6 @@ const PM25Chart = ({ userPreferences }) => {
         }
       },
       y: {
-        stacked: true,
         beginAtZero: true,
         title: {
           display: true,
@@ -187,23 +195,7 @@ const PM25Chart = ({ userPreferences }) => {
       },
       tooltip: {
         mode: 'index',
-        intersect: false,
-        callbacks: {
-          label: function(context) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-            const stackTotal = context.chart.data.datasets.reduce((total, dataset) => {
-              const value = dataset.data[context.dataIndex];
-              return total + (isNaN(value) ? 0 : value);
-            }, 0);
-            
-            if (label === 'With Ecologica') {
-              const reduction = ((context.chart.data.datasets[2].data[context.dataIndex] - value) / context.chart.data.datasets[2].data[context.dataIndex] * 100).toFixed(1);
-              return `${label}: ${value.toFixed(1)} μg/m³ (${reduction}% total reduction)`;
-            }
-            return `${label}: ${stackTotal.toFixed(1)} μg/m³`;
-          }
-        }
+        intersect: false
       }
     }
   };
@@ -212,54 +204,18 @@ const PM25Chart = ({ userPreferences }) => {
     <div className="content-wrapper">
       <div className="chart-side">
         <div style={{ height: '400px', width: '100%' }}>
-          <Bar data={chartData} options={options} />
+          <Line data={chartData} options={options} />
         </div>
-        <div className="chart-legend">
-          {chartData.datasets.map((dataset, index) => (
-            <div key={index} className="legend-item" onClick={() => toggleDataset(dataset.label)}>
-              <span 
-                className="legend-color" 
-                style={{ backgroundColor: dataset.borderColor }}
-              ></span>
-              <span>{dataset.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="data-side">
-        <div className="key-data-title">
-          KEY DATA POINTS
-        </div>
-        <div className="key-data-points">
-          <div className="key-data-point">
-            <span className="key-data-number">
-              {weatherData && calculateDaysOverThreshold(weatherData, 12)}
-            </span>
-            <span className="key-data-label">
-              days over<br />
-              12μg/m³
-            </span>
-          </div>
-          <div className="key-data-point">
-            <span className="key-data-number">
-              {weatherData && calculateDaysOverThreshold(weatherData, 35)}
-            </span>
-            <span className="key-data-label">
-              days over<br />
-              35μg/m³
-            </span>
-          </div>
-          <div className="key-data-point">
-            <span className="key-data-number">
-              {weatherData && calculateDaysOverThreshold(weatherData, 55)}
-            </span>
-            <span className="key-data-label">
-              days over<br />
-              55μg/m³
-            </span>
-          </div>
-        </div>
+        <ChartLegend 
+          activeDatasets={activeDatasets}
+          onToggle={(label) => {
+            setActiveDatasets(prev => ({
+              ...prev,
+              [label]: !prev[label]
+            }));
+          }}
+          userPreferences={userPreferences}
+        />
       </div>
     </div>
   );

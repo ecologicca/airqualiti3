@@ -27,69 +27,80 @@ const CityComparisonChart = ({ userPreferences }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCityData = async () => {
       try {
-        // Get data for the last 60 days for all cities
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 60);
-
-        // Get all cities using a different approach
-        const { data: weatherData, error: dataError } = await supabase
+        // Get data for multiple cities for the last 7 days
+        const { data: cityData, error: cityError } = await supabase
           .from('weather_data')
           .select('*')
-          .gte('created_at', startDate.toISOString())
-          .lte('created_at', endDate.toISOString());
+          .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false });
 
-        if (dataError) throw dataError;
+        if (cityError) throw cityError;
 
-        // Get unique cities from the data
-        const cities = [...new Set(weatherData.map(item => item.city))];
+        if (!cityData || cityData.length === 0) {
+          setError('No data available');
+          setIsLoading(false);
+          return;
+        }
 
-        // Calculate 60-day averages for each city
-        const cityAverages = cities.map(city => {
-          const cityData = weatherData.filter(item => item.city === city);
-          const pm25Average = cityData.reduce((sum, item) => sum + (item.pm25 || 0), 0) / (cityData.length || 1);
-          const pm10Average = cityData.reduce((sum, item) => sum + (item.pm10 || 0), 0) / (cityData.length || 1);
-          return {
-            city,
-            pm25Average: parseFloat(pm25Average.toFixed(1)),
-            pm10Average: parseFloat(pm10Average.toFixed(1))
-          };
-        });
+        // Group data by cities
+        const cityAverages = cityData.reduce((acc, item) => {
+          if (!acc[item.city]) {
+            acc[item.city] = {
+              pm25Values: [],
+              pm10Values: []
+            };
+          }
+          if (item.pm25) acc[item.city].pm25Values.push(item.pm25);
+          if (item.pm10) acc[item.city].pm10Values.push(item.pm10);
+          return acc;
+        }, {});
 
-        // Sort cities by average PM2.5 levels
-        cityAverages.sort((a, b) => b.pm25Average - a.pm25Average);
+        // Calculate averages for each city
+        const averages = Object.entries(cityAverages).map(([city, values]) => ({
+          city,
+          pm25Average: values.pm25Values.length > 0 
+            ? values.pm25Values.reduce((sum, val) => sum + val, 0) / values.pm25Values.length 
+            : 0,
+          pm10Average: values.pm10Values.length > 0 
+            ? values.pm10Values.reduce((sum, val) => sum + val, 0) / values.pm10Values.length 
+            : 0
+        }));
 
-        setChartData({
-          labels: cityAverages.map(item => item.city),
+        // Sort cities by PM2.5 levels
+        averages.sort((a, b) => b.pm25Average - a.pm25Average);
+
+        const formattedData = {
+          labels: averages.map(city => city.city),
           datasets: [
             {
-              label: '60-Day Average PM2.5',
-              data: cityAverages.map(item => item.pm25Average),
-              backgroundColor: 'rgba(0, 100, 0, 0.7)',
-              borderColor: 'rgba(0, 100, 0, 1)',
+              label: 'PM2.5 Average',
+              data: averages.map(city => city.pm25Average),
+              backgroundColor: '#D9F6BB',
+              borderColor: '#043A24',
               borderWidth: 1
             },
             {
-              label: '60-Day Average PM10',
-              data: cityAverages.map(item => item.pm10Average),
-              backgroundColor: 'rgba(144, 238, 144, 0.7)',
-              borderColor: 'rgba(144, 238, 144, 1)',
+              label: 'PM10 Average',
+              data: averages.map(city => city.pm10Average),
+              backgroundColor: '#A9ED8A',
+              borderColor: '#043A24',
               borderWidth: 1
             }
           ]
-        });
+        };
 
+        setChartData(formattedData);
+        setIsLoading(false);
       } catch (err) {
         console.error('Error fetching city comparison data:', err);
-        setError('Failed to load city comparison data');
-      } finally {
+        setError('Failed to fetch data');
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchCityData();
   }, []);
 
   if (isLoading) return <div>Loading city comparison data...</div>;
@@ -104,32 +115,25 @@ const CityComparisonChart = ({ userPreferences }) => {
         beginAtZero: true,
         title: {
           display: true,
-          text: 'PM2.5 μg/m³ (Weekly Average)'
-        }
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Cities'
+          text: 'μg/m³'
         }
       }
     },
     plugins: {
       legend: {
-        display: false
-      },
-      title: {
-        display: true,
-        text: 'Weekly Average PM2.5 by City',
-        color: '#2e7d32',
-        font: {
-          size: 16
-        }
+        position: 'bottom'
       },
       tooltip: {
         callbacks: {
           label: function(context) {
-            return `Average: ${context.parsed.y} μg/m³`;
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y.toFixed(1) + ' μg/m³';
+            }
+            return label;
           }
         }
       }
@@ -137,8 +141,10 @@ const CityComparisonChart = ({ userPreferences }) => {
   };
 
   return (
-    <div style={{ height: '400px', width: '100%' }}>
-      <Bar data={chartData} options={options} />
+    <div className="chart-side">
+      <div className="chart-wrapper">
+        <Bar data={chartData} options={options} />
+      </div>
     </div>
   );
 };
