@@ -112,7 +112,7 @@ const Login = () => {
             </div>
           </form>
         )}
-        <button className="signup-button" onClick={() => navigate('/Signup')}>
+        <button className="signup-button" onClick={() => navigate('/signup')}>
           Sign Up
         </button>
       </div>
@@ -129,7 +129,9 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '1rem',
-    transition: 'background-color 0.2s ease',
+    ':hover': {
+      backgroundColor: '#1a4d33',
+    },
   },
 };
 
