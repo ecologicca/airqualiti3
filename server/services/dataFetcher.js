@@ -45,16 +45,15 @@ async function fetchAirQualityData(city) {
         // Map data to match database schema
         return {
             city: city,
-            station_id: data.data.idx || null,
-            created_at: data.data.time?.s || new Date().toISOString(), // Use API timestamp if available
-            pm25: parseFloat(data.data.iaqi.pm25?.v) || null,
-            pm10: parseFloat(data.data.iaqi.pm10?.v) || null,
-            air_quality: data.data.aqi?.toString() || null, // Map AQI to air_quality as text
-            o3: parseFloat(data.data.iaqi.o3?.v) || null,
-            co: parseFloat(data.data.iaqi.co?.v) || null,
-            no2: parseFloat(data.data.iaqi.no2?.v) || null,
-            so2: parseFloat(data.data.iaqi.so2?.v) || null,
-            temp: data.data.iaqi.t?.v?.toString() || null // Keep temp as text as per schema
+            station_id: data.data.idx ? parseInt(data.data.idx) : null,
+            created_at: data.data.time?.s || new Date().toISOString(),
+            pm25: data.data.iaqi.pm25?.v ? parseFloat(data.data.iaqi.pm25.v) : null,
+            pm10: data.data.iaqi.pm10?.v ? parseFloat(data.data.iaqi.pm10.v) : null,
+            air_quality: data.data.aqi ? data.data.aqi.toString() : null,
+            temp: data.data.iaqi.t?.v ? data.data.iaqi.t.v.toString() : null,
+            co: data.data.iaqi.co?.v ? parseFloat(data.data.iaqi.co.v) : null,
+            no2: data.data.iaqi.no2?.v ? parseFloat(data.data.iaqi.no2.v) : null,
+            so2: data.data.iaqi.so2?.v ? parseFloat(data.data.iaqi.so2.v) : null
         };
     } catch (error) {
         if (error instanceof AppError) {
