@@ -63,39 +63,114 @@ async function fetchAirQualityData(city) {
 }
 
 async function storeDataInSupabase(data) {
-    const { error } = await supabase
-        .from('weather_data')
-        .insert(data);
+    try {
+        console.log('Attempting to store data:', JSON.stringify(data, null, 2));
+        
+        // Validate data before insertion
+        const validData = data.filter(item => {
+            const isValid = item && item.city && 
+                          (item.pm25 !== null || item.pm10 !== null || 
+                           item.temp !== null || item.co !== null || 
+                           item.o3 !== null || item.aqi !== null);
+            
+            if (!isValid) {
+                console.warn('Invalid data item:', item);
+            }
+            return isValid;
+        });
 
-    if (error) {
-        console.error('Error storing data in Supabase:', error);
-        throw new AppError('Failed to store data in database', 500);
+        if (validData.length === 0) {
+            throw new Error('No valid data to insert');
+        }
+
+        const { data: insertedData, error } = await supabase
+            .from('weather_data')
+            .insert(validData)
+            .select(); // Add this to get back the inserted data
+
+        if (error) {
+            console.error('Supabase insertion error:', error);
+            throw new AppError('Failed to store data in database', 500);
+        }
+
+        console.log('Successfully stored data. Inserted rows:', insertedData.length);
+        return insertedData;
+    } catch (error) {
+        console.error('Error in storeDataInSupabase:', error);
+        throw error;
     }
 }
 
 // Function to manually trigger data fetch (for testing)
 async function manualFetch() {
     try {
-        console.log('Starting data fetch...');
+        console.log('Starting manual data fetch...');
         
         const cities = await getCities();
         console.log('Found cities:', cities);
         
-        const dataPromises = cities.map(city => fetchAirQualityData(city));
-        const cityData = await Promise.all(dataPromises);
-        console.log('Fetched data:', cityData);
-        
-        await storeDataInSupabase(cityData);
-        console.log('Successfully stored data in Supabase');
+        if (!cities || cities.length === 0) {
+            throw new Error('No cities found to fetch data for');
+        }
+
+        const results = [];
+        // Fetch cities sequentially to avoid rate limits
+        for (const city of cities) {
+            try {
+                console.log(`Fetching data for ${city}...`);
+                const cityData = await fetchAirQualityData(city);
+                console.log(`Successfully fetched data for ${city}:`, cityData);
+                results.push(cityData);
+            } catch (error) {
+                console.error(`Error fetching data for ${city}:`, error);
+                // Continue with other cities even if one fails
+            }
+        }
+
+        if (results.length === 0) {
+            throw new Error('Failed to fetch data for any cities');
+        }
+
+        console.log('Attempting to store data for cities:', results.map(r => r.city));
+        const storedData = await storeDataInSupabase(results);
         
         return { 
             success: true, 
-            message: 'Data fetch completed',
-            cities: cities
+            message: 'Data fetch and storage completed',
+            citiesProcessed: results.map(r => r.city),
+            storedDataCount: storedData.length
         };
     } catch (error) {
         console.error('Error in manualFetch:', error);
-        return { success: false, error: error.message };
+        return { 
+            success: false, 
+            error: error.message,
+            details: error.stack
+        };
+    }
+}
+
+async function verifyDataStorage(cities) {
+    try {
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+        
+        const { data, error } = await supabase
+            .from('weather_data')
+            .select('*')
+            .gte('created_at', fiveMinutesAgo.toISOString())
+            .in('city', cities);
+
+        if (error) {
+            console.error('Error verifying data storage:', error);
+            return false;
+        }
+
+        console.log('Recently stored data:', data);
+        return data.length > 0;
+    } catch (error) {
+        console.error('Error in verifyDataStorage:', error);
+        return false;
     }
 }
 
@@ -114,5 +189,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-    manualFetch
+    manualFetch,
+    verifyDataStorage
 }; 
