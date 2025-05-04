@@ -70,9 +70,10 @@ async function storeDataInSupabase(data) {
         
         // Validate data before insertion
         const validData = data.filter(item => {
-            const isValid = item && item.city && 
-                          (item.pm25 !== null || item.pm10 !== null || 
-                           item.air_quality !== null);
+            const isValid = item && 
+                            item.city && 
+                            (item.pm25 !== null || 
+                             item.air_quality !== null);
             
             if (!isValid) {
                 console.warn('Invalid data item:', item);
