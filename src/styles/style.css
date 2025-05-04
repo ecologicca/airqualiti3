@@ -567,27 +567,37 @@ body {
   .chart-legend {
     display: flex;
     justify-content: center;
-    gap: 2rem;
+    gap: 1rem;
     margin-top: 1rem;
-    flex-wrap: wrap;
   }
   
   .legend-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
     cursor: pointer;
+    color: var(--button-color);
+    border-radius: 20px;
+    transition: all 0.3s ease;
   }
   
-  .legend-color {
+  .legend-item .legend-dot {
     width: 12px;
     height: 12px;
     border-radius: 50%;
+    background-color: var(--button-color);
+    opacity: 0.3;
   }
   
-  .legend-label {
-    font-size: 0.9rem;
-    color: #666;
+  .legend-item.active .legend-dot {
+    opacity: 1;
+  }
+  
+  .legend-item:hover {
+    background-color: rgba(4, 58, 36, 0.1);
   }
   
   .charts-grid {
@@ -1560,42 +1570,123 @@ body {
   }
   
   /* Add these styles to expand the Insights page layout */
-  .insights-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 2rem;
-    margin: 2rem 0;
+  .insights-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
   }
   
   .insight-card {
     background: white;
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease;
-    min-height: 250px;
+    box-shadow: 0 2px 4px rgba(4, 58, 36, 0.1);
+    margin-bottom: 2rem;
   }
   
-  .insight-card:hover {
-    transform: translateY(-4px);
-  }
-  
-  .insight-icon {
-    font-size: 2rem;
-    color: #043A24;
+  .insight-header {
     margin-bottom: 1.5rem;
   }
   
-  .insight-title {
-    font-size: 1.5rem;
+  .insight-header h2 {
     color: #043A24;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
   
-  .insight-description {
-    font-size: 1.1rem;
-    line-height: 1.6;
+  .insight-header p {
     color: #666;
+    font-size: 0.9rem;
+  }
+  
+  .chart-section {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    margin-top: 1rem;
+  }
+  
+  .chart-wrapper {
+    width: 100%;
+    height: 350px; /* Reduced height to make room for legend */
+    position: relative;
+  }
+  
+  .legend-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid #eee;
+  }
+  
+  .legend-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+  }
+  
+  .legend-button .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  
+  .legend-button.active .legend-dot {
+    opacity: 1;
+  }
+  
+  .legend-button:hover {
+    background-color: rgba(4, 58, 36, 0.1);
+  }
+  
+  .period-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .toggle-button {
+    padding: 8px 16px;
+    border: 2px solid #043A24;
+    background: none;
+    color: #043A24;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .toggle-button.active {
+    background: #043A24;
+    color: white;
+  }
+  
+  .toggle-button:hover {
+    background: rgba(4, 58, 36, 0.1);
+  }
+  
+  .toggle-button.active:hover {
+    background: #043A24;
+  }
+  
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  
+  .risk-chart {
+    height: 300px;
+    margin-top: 1rem;
   }
   
   /* Add these styles to expand the Resources page layout */

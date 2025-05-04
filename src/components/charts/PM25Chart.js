@@ -133,7 +133,7 @@ const PM25Chart = ({ data, userPreferences }) => {
 
       // Add Air Purifier dataset if available
       if (userPreferences?.has_ecologgica) {
-        formattedData.datasets.push({
+      formattedData.datasets.push({
           label: 'Air Purifier',
           data: aggregatedData.map(item => ({
             x: new Date(item.date),
@@ -148,7 +148,7 @@ const PM25Chart = ({ data, userPreferences }) => {
           borderWidth: 2,
           tension: 0.1,
           hidden: !activeDatasets['Air Purifier']
-        });
+      });
       }
 
       setChartData(formattedData);

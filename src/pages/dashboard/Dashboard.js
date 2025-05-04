@@ -26,11 +26,24 @@ const calculateDeeperSleepMinutes = (data, hasEcologica) => {
   return daysUnderThreshold * 8 * 60;
 };
 
+const REFRESH_COOLDOWN = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 const Dashboard = () => {
   const [data, setData] = useState([]);
   const [userPreferences, setUserPreferences] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [nextRefreshTime, setNextRefreshTime] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+
+  // Add function to format time remaining
+  const formatTimeRemaining = (ms) => {
+    if (!ms) return '';
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   const fetchData = async () => {
     try {
@@ -76,6 +89,7 @@ const Dashboard = () => {
     }
   };
 
+  // Update triggerNewDataFetch with cooldown logic
   const triggerNewDataFetch = async () => {
     try {
       setIsRefreshing(true);
@@ -84,7 +98,7 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       // Make the API call with the session token
-      const response = await fetch('https://app.ecologicca.com/api/test-fetch', {
+      const response = await fetch('http://localhost:3001/api/test-fetch', {
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
         }
@@ -93,6 +107,11 @@ const Dashboard = () => {
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.statusText}`);
       }
+      
+      // Set next refresh time
+      const nextRefresh = Date.now() + REFRESH_COOLDOWN;
+      setNextRefreshTime(nextRefresh);
+      localStorage.setItem('lastRefreshTime', Date.now().toString());
       
       // Wait a few seconds for the data to be stored
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -106,6 +125,33 @@ const Dashboard = () => {
       setIsRefreshing(false);
     }
   };
+
+  // Add useEffect to handle cooldown timer
+  useEffect(() => {
+    // Check last refresh time from localStorage
+    const lastRefresh = localStorage.getItem('lastRefreshTime');
+    if (lastRefresh) {
+      const nextRefresh = parseInt(lastRefresh) + REFRESH_COOLDOWN;
+      if (nextRefresh > Date.now()) {
+        setNextRefreshTime(nextRefresh);
+      }
+    }
+
+    // Update time remaining
+    const interval = setInterval(() => {
+      if (nextRefreshTime) {
+        const remaining = nextRefreshTime - Date.now();
+        if (remaining > 0) {
+          setTimeRemaining(remaining);
+        } else {
+          setTimeRemaining(null);
+          setNextRefreshTime(null);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextRefreshTime]);
 
   useEffect(() => {
     fetchData();
@@ -146,13 +192,20 @@ const Dashboard = () => {
     <div className="dashboard">
       <div className="dashboard-title">
         <span>Air Quality Dashboard</span>
-        <button 
-          className="refresh-button"
-          onClick={triggerNewDataFetch}
-          disabled={isRefreshing}
-        >
-          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-        </button>
+        <div className="refresh-container">
+          {timeRemaining && (
+            <span className="refresh-timer">
+              Next refresh in: {formatTimeRemaining(timeRemaining)}
+            </span>
+          )}
+          <button 
+            className="refresh-button"
+            onClick={triggerNewDataFetch}
+            disabled={isRefreshing || timeRemaining !== null}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+        </div>
       </div>
 
       <div className="dashboard-content">

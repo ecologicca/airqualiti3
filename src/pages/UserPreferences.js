@@ -36,26 +36,26 @@ const UserPreferences = () => {
     fetchPreferences();
   }, []);
 
-  const fetchPreferences = async () => {
-    try {
+    const fetchPreferences = async () => {
+      try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) throw userError;
       
-      if (!user) {
-        navigate('/login');
-        return;
-      }
+        if (!user) {
+          navigate('/login');
+          return;
+        }
 
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
       
-      if (data) {
+        if (data) {
         // Convert any null values to defaults
         setPreferences({
           ...preferences,
@@ -64,13 +64,13 @@ const UserPreferences = () => {
           activity_level: data.activity_level || 5,
           sleep_level: Object.entries(sleepQualityMap).find(([key, value]) => value === data.sleep_level)?.[0] || 'moderate'
         });
-      }
-    } catch (error) {
+        }
+      } catch (error) {
       console.error('Error fetching preferences:', error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -121,45 +121,45 @@ const UserPreferences = () => {
         
         <form onSubmit={handleSave} className="preferences-form">
           <div className="form-row">
-            <div className="form-group">
+          <div className="form-group">
               <label>First Name</label>
-              <input
-                type="text"
-                value={preferences.first_name}
+            <input
+              type="text"
+              value={preferences.first_name}
                 onChange={(e) => setPreferences({ ...preferences, first_name: e.target.value })}
                 className="form-input"
                 placeholder="Enter first name"
-              />
-            </div>
+            />
+          </div>
 
-            <div className="form-group">
+          <div className="form-group">
               <label>Last Name</label>
-              <input
-                type="text"
-                value={preferences.last_name}
+            <input
+              type="text"
+              value={preferences.last_name}
                 onChange={(e) => setPreferences({ ...preferences, last_name: e.target.value })}
                 className="form-input"
                 placeholder="Enter last name"
-              />
+            />
             </div>
           </div>
 
           <div className="form-row">
-            <div className="form-group">
+          <div className="form-group">
               <label>Birthdate</label>
               <input
                 type="date"
                 value={preferences.birthdate || ''}
                 onChange={(e) => setPreferences({ ...preferences, birthdate: e.target.value })}
                 className="form-input"
-              />
-            </div>
+            />
+          </div>
 
-            <div className="form-group">
+          <div className="form-group">
               <label>City</label>
               <input
                 type="text"
-                value={preferences.city}
+              value={preferences.city}
                 onChange={(e) => setPreferences({ ...preferences, city: e.target.value })}
                 className="form-input"
                 placeholder="Enter city"
@@ -168,13 +168,13 @@ const UserPreferences = () => {
           </div>
 
           <div className="form-row">
-            <div className="form-group">
+          <div className="form-group">
               <label>Anxiety Base Level: {preferences.anxiety_base_level}</label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={preferences.anxiety_base_level}
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={preferences.anxiety_base_level}
                 onChange={(e) => setPreferences({ ...preferences, anxiety_base_level: parseInt(e.target.value) })}
                 className="form-slider"
               />
@@ -188,13 +188,13 @@ const UserPreferences = () => {
                 max="10"
                 value={preferences.activity_level}
                 onChange={(e) => setPreferences({ ...preferences, activity_level: parseInt(e.target.value) })}
-                className="form-slider"
-              />
+              className="form-slider"
+            />
             </div>
           </div>
 
           <div className="form-row">
-            <div className="form-group">
+          <div className="form-group">
               <label>Sleep Quality</label>
               <select
                 value={preferences.sleep_level}

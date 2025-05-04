@@ -28,7 +28,7 @@ const CityComparisonChart = ({ userPreferences }) => {
 
   useEffect(() => {
     const fetchCityData = async () => {
-      try {
+    try {
         // Get data for multiple cities for the last 7 days
         const { data: cityData, error: cityError } = await supabase
           .from('weather_data')
@@ -39,65 +39,65 @@ const CityComparisonChart = ({ userPreferences }) => {
         if (cityError) throw cityError;
 
         if (!cityData || cityData.length === 0) {
-          setError('No data available');
-          setIsLoading(false);
-          return;
-        }
+        setError('No data available');
+        setIsLoading(false);
+        return;
+      }
 
-        // Group data by cities
+      // Group data by cities
         const cityAverages = cityData.reduce((acc, item) => {
-          if (!acc[item.city]) {
-            acc[item.city] = {
-              pm25Values: [],
-              pm10Values: []
-            };
-          }
+        if (!acc[item.city]) {
+          acc[item.city] = {
+            pm25Values: [],
+            pm10Values: []
+          };
+        }
           if (item.pm25) acc[item.city].pm25Values.push(item.pm25);
           if (item.pm10) acc[item.city].pm10Values.push(item.pm10);
-          return acc;
-        }, {});
+        return acc;
+      }, {});
 
-        // Calculate averages for each city
+      // Calculate averages for each city
         const averages = Object.entries(cityAverages).map(([city, values]) => ({
-          city,
-          pm25Average: values.pm25Values.length > 0 
-            ? values.pm25Values.reduce((sum, val) => sum + val, 0) / values.pm25Values.length 
-            : 0,
-          pm10Average: values.pm10Values.length > 0 
-            ? values.pm10Values.reduce((sum, val) => sum + val, 0) / values.pm10Values.length 
-            : 0
-        }));
+        city,
+        pm25Average: values.pm25Values.length > 0 
+          ? values.pm25Values.reduce((sum, val) => sum + val, 0) / values.pm25Values.length 
+          : 0,
+        pm10Average: values.pm10Values.length > 0 
+          ? values.pm10Values.reduce((sum, val) => sum + val, 0) / values.pm10Values.length 
+          : 0
+      }));
 
-        // Sort cities by PM2.5 levels
+      // Sort cities by PM2.5 levels
         averages.sort((a, b) => b.pm25Average - a.pm25Average);
 
-        const formattedData = {
+      const formattedData = {
           labels: averages.map(city => city.city),
-          datasets: [
-            {
-              label: 'PM2.5 Average',
+        datasets: [
+          {
+            label: 'PM2.5 Average',
               data: averages.map(city => city.pm25Average),
               backgroundColor: '#D9F6BB',
               borderColor: '#043A24',
-              borderWidth: 1
-            },
-            {
-              label: 'PM10 Average',
+            borderWidth: 1
+          },
+          {
+            label: 'PM10 Average',
               data: averages.map(city => city.pm10Average),
               backgroundColor: '#A9ED8A',
               borderColor: '#043A24',
-              borderWidth: 1
-            }
-          ]
-        };
+            borderWidth: 1
+          }
+        ]
+      };
 
-        setChartData(formattedData);
-        setIsLoading(false);
-      } catch (err) {
+      setChartData(formattedData);
+      setIsLoading(false);
+    } catch (err) {
         console.error('Error fetching city comparison data:', err);
         setError('Failed to fetch data');
-        setIsLoading(false);
-      }
+      setIsLoading(false);
+    }
     };
 
     fetchCityData();
@@ -143,7 +143,7 @@ const CityComparisonChart = ({ userPreferences }) => {
   return (
     <div className="chart-side">
       <div className="chart-wrapper">
-        <Bar data={chartData} options={options} />
+      <Bar data={chartData} options={options} />
       </div>
     </div>
   );

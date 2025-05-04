@@ -173,33 +173,52 @@ app.get('*', function(req, res) {
 // Schedule data fetching twice per day at 6 AM and 6 PM UTC
 const cronSchedules = ['0 6 * * *', '0 18 * * *'];
 
-cronSchedules.forEach(schedule => {
-  cron.schedule(schedule, async () => {
-    try {
-      logToFile(`Cron job started (Schedule: ${schedule})`);
-      await fetchAndLogWeatherData('cron');
-    } catch (error) {
-      // Error is already logged in fetchAndLogWeatherData
-    }
-  }, {
-    timezone: 'UTC' // Explicitly set timezone to UTC
-  });
-});
-
-// Wait 30 seconds before initial fetch to ensure everything is properly initialized
-setTimeout(async () => {
+cron.schedule(cronSchedules[0], async () => {
   try {
-    await fetchAndLogWeatherData('server-start');
+    logToFile(`Cron job started (Schedule: ${cronSchedules[0]})`);
+    await fetchAndLogWeatherData('cron');
   } catch (error) {
     // Error is already logged in fetchAndLogWeatherData
   }
-}, 30000); // 30 second delay
+}, {
+  timezone: 'UTC'
+});
+
+cron.schedule(cronSchedules[1], async () => {
+  try {
+    logToFile(`Cron job started (Schedule: ${cronSchedules[1]})`);
+    await fetchAndLogWeatherData('cron');
+  } catch (error) {
+    // Error is already logged in fetchAndLogWeatherData
+  }
+}, {
+  timezone: 'UTC'
+});
+
+// Initial fetch with proper delay and retry
+const initialFetch = async (retryCount = 0) => {
+  try {
+    logToFile('Attempting initial data fetch...');
+    await fetchAndLogWeatherData('server-start');
+    logToFile('Initial fetch successful');
+  } catch (error) {
+    if (retryCount < 3) {
+      const delay = (retryCount + 1) * 60000; // Increase delay with each retry
+      logToFile(`Initial fetch failed, retrying in ${delay/1000} seconds...`);
+      setTimeout(() => initialFetch(retryCount + 1), delay);
+    } else {
+      logToFile('Initial fetch failed after 3 attempts');
+    }
+  }
+};
+
+// Wait 2 minutes before initial fetch to ensure everything is properly initialized
+setTimeout(() => initialFetch(), 120000);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   logToFile(`Server running on port ${PORT}`);
   logToFile('Cron schedules (UTC):');
-  cronSchedules.forEach(schedule => {
-    logToFile(`- ${schedule}`);
-  });
-});
+  logToFile(`- ${cronSchedules[0]}`);
+  logToFile(`- ${cronSchedules[1]}`);
+}); 

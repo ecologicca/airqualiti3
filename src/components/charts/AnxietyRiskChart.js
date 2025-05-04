@@ -8,7 +8,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
@@ -25,8 +26,37 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler
 );
+
+const ALGORITHMS = {
+  WEEKLY: {
+    code: 'anxSym96',
+    period_days: 7,
+    color: '#043A24',
+    age_group: '65+',
+    description: 'Weekly anxiety risk for seniors (65+)',
+    threshold: 5,
+    base_ratio: 1.14
+  },
+  MONTHLY_GENERAL: {
+    code: 'anxSym961',
+    period_days: 30,
+    color: '#90c789',
+    description: 'Monthly anxiety risk (all ages)',
+    threshold: 5,
+    base_ratio: 1.34
+  },
+  QUARTERLY: {
+    code: 'anxDis32',
+    period_days: 90,
+    color: '#D9F6BB',
+    description: 'Quarterly anxiety risk (all ages)',
+    threshold: 1.13,
+    base_ratio: 1.097
+  }
+};
 
 const calculateAnxietyRisk = (baseLevel, pm10, hasHVAC, hasAirPurifier) => {
   // Calculate the adjusted PM10 value based on indoor/device settings
@@ -77,147 +107,163 @@ const aggregateDataByDay = (data) => {
   }));
 };
 
-const AnxietyRiskChart = ({ data, userPreferences }) => {
+const AnxietyRiskChart = ({ userPreferences }) => {
+  const [selectedPeriod, setSelectedPeriod] = useState('MONTHLY_GENERAL');
   const [chartData, setChartData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeDatasets, setActiveDatasets] = useState({
-    'Outdoor': true,
-    'Indoor': true,
-    'HVAC': false,
-    'Air Purifier': false
-  });
+  const [algorithms, setAlgorithms] = useState({});
+  const [algorithmDescriptions, setAlgorithmDescriptions] = useState({});
 
-  const toggleDataset = (name) => {
-    if (name === 'HVAC' || name === 'Air Purifier') {
-      setActiveDatasets(prev => ({
-        ...prev,
-        'Indoor': true,
-        [name]: !prev[name]
-      }));
-    } else {
-      setActiveDatasets(prev => ({
-        ...prev,
-        [name]: !prev[name]
-      }));
+  // Fetch algorithm descriptions from Supabase
+  useEffect(() => {
+    const fetchAlgorithmDescriptions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('risk_algorithms')
+          .select('code, description')
+          .in('code', Object.values(ALGORITHMS).map(a => a.code));
+
+        if (error) throw error;
+
+        // Create a map of algorithm codes to their descriptions
+        const descMap = data.reduce((acc, algo) => {
+          acc[algo.code] = algo.description;
+          return acc;
+        }, {});
+
+        setAlgorithmDescriptions(descMap);
+      } catch (err) {
+        console.error('Error fetching algorithm descriptions:', err);
+      }
+    };
+
+    fetchAlgorithmDescriptions();
+  }, []);
+
+  // Set up algorithms based on user age
+  useEffect(() => {
+    if (!userPreferences?.birthdate) return;
+
+    const userAge = calculateAge(userPreferences.birthdate);
+    console.log('Setting up algorithms for user age:', userAge);
+
+    const filteredAlgos = Object.entries(ALGORITHMS).reduce((acc, [key, algo]) => {
+      if (algo.age_group === '65+' && userAge < 65) {
+        return acc;
+      }
+      return { ...acc, [key]: algo };
+    }, {});
+    
+    console.log('Setting filtered algorithms:', filteredAlgos);
+    setAlgorithms(filteredAlgos);
+  }, [userPreferences?.birthdate]);
+
+  // Fetch and process data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!algorithms || !selectedPeriod || !userPreferences?.city) {
+          console.log('Missing required data:', {
+            hasAlgorithms: !!algorithms,
+            selectedPeriod,
+            city: userPreferences?.city
+          });
+          return;
+        }
+
+        const currentAlgo = algorithms[selectedPeriod];
+        if (!currentAlgo) {
+          console.log('Available algorithms:', Object.keys(algorithms));
+          console.log('Selected period:', selectedPeriod);
+          console.log('No matching algorithm found');
+          return;
+        }
+
+        console.log('Using algorithm:', currentAlgo);
+
+        // Fetch PM2.5 data
+        const { data: pmData, error: pmError } = await supabase
+          .from('weather_data')
+          .select('*')
+          .eq('city', userPreferences.city)
+          .order('created_at', { ascending: false })
+          .limit(currentAlgo.period_days * 4);
+
+        if (pmError) throw pmError;
+
+        if (!pmData || pmData.length === 0) {
+          setError('No weather data available for your city');
+          return;
+        }
+
+        console.log('Fetched PM2.5 data:', pmData);
+
+        // Process data into periods
+        const periodData = [];
+        for (let i = 0; i < pmData.length; i += currentAlgo.period_days) {
+          const periodSlice = pmData.slice(i, i + currentAlgo.period_days);
+          const startDate = new Date(periodSlice[0].created_at);
+          
+          const daysExceeded = periodSlice.filter(day => day.pm25 > currentAlgo.threshold).length;
+          const baseRisk = userPreferences.anxiety_base_level || 5;
+          const riskIncrease = (daysExceeded / currentAlgo.period_days) * currentAlgo.base_ratio;
+          const riskScore = baseRisk * (1 + riskIncrease);
+
+          periodData.push({
+            x: startDate,
+            y: riskScore,
+            daysExceeded,
+            totalDays: periodSlice.length,
+            threshold: currentAlgo.threshold,
+            pm25Values: periodSlice.map(d => d.pm25)
+          });
+        }
+
+        console.log('Processed period data:', periodData);
+
+        setChartData({
+          labels: periodData.map(period => period.x),
+          datasets: [{
+            label: `${selectedPeriod.split('_')[0].charAt(0) + selectedPeriod.split('_')[0].slice(1).toLowerCase()} Anxiety Risk`,
+            data: periodData,
+            borderColor: currentAlgo.color,
+            backgroundColor: `${currentAlgo.color}20`,
+            borderWidth: 2,
+            tension: 0.1,
+            fill: true
+          }]
+        });
+
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [algorithms, selectedPeriod, userPreferences?.city]);
+
+  const calculateAge = (birthdate) => {
+    if (!birthdate) return 0;
+    const birth = new Date(birthdate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
     }
+    return age;
   };
 
-  useEffect(() => {
-    try {
-      if (!data || data.length === 0) {
-        setError('No data available');
-        setIsLoading(false);
-        return;
-      }
-
-      const aggregatedData = aggregateDataByDay(data);
-
-      const formattedData = {
-        labels: aggregatedData.map(item => item.date),
-        datasets: []
-      };
-
-      // Add base indoor value (without devices)
-      formattedData.datasets.push({
-        label: 'Indoor',
-        data: aggregatedData.map(item => ({
-          x: item.date,
-          y: item['PM 10'] ? 
-            calculateAnxietyRisk(
-              userPreferences.anxietyLevel,
-              item['PM 10'],
-              false,
-              false
-            ) : null
-        })),
-        borderColor: '#D9F6BB',
-        backgroundColor: 'rgba(217, 246, 187, 0.1)',
-        fill: false,
-        tension: 0.4,
-        borderWidth: 2,
-        hidden: !activeDatasets['Indoor']
-      });
-
-      // Add HVAC if enabled
-      if (userPreferences?.has_HVAC) {
-        formattedData.datasets.push({
-          label: 'HVAC',
-          data: aggregatedData.map(item => ({
-            x: item.date,
-            y: item['PM 10'] ? 
-              calculateAnxietyRisk(
-                userPreferences.anxietyLevel,
-                item['PM 10'],
-                true,
-                false
-              ) : null
-          })),
-          borderColor: '#A9ED8A',
-          backgroundColor: 'rgba(169, 237, 138, 0.1)',
-          fill: false,
-          tension: 0.4,
-          borderWidth: 2,
-          hidden: !activeDatasets['HVAC']
-        });
-      }
-
-      // Add Air Purifier if enabled
-      if (userPreferences?.hasEcologica) {
-        formattedData.datasets.push({
-          label: 'Air Purifier',
-          data: aggregatedData.map(item => ({
-            x: item.date,
-            y: item['PM 10'] ? 
-              calculateAnxietyRisk(
-                userPreferences.anxietyLevel,
-                item['PM 10'],
-                false,
-                true
-              ) : null
-          })),
-          borderColor: '#7FD663',
-          backgroundColor: 'rgba(127, 214, 99, 0.1)',
-          fill: false,
-          tension: 0.4,
-          borderWidth: 2,
-          hidden: !activeDatasets['Air Purifier']
-        });
-      }
-
-      // Add Outdoor (top layer)
-      formattedData.datasets.push({
-        label: 'Outdoor',
-        data: aggregatedData.map(item => ({
-          x: item.date,
-          y: item['PM 10'] ? 
-            calculateAnxietyRisk(
-              userPreferences.anxietyLevel,
-              item['PM 10'],
-              false,
-              false
-            ) : null
-        })),
-        borderColor: '#043A24',
-        backgroundColor: 'rgba(4, 58, 36, 0.1)',
-        fill: false,
-        tension: 0.4,
-        borderWidth: 2,
-        hidden: !activeDatasets['Outdoor']
-      });
-
-      setChartData(formattedData);
-      setError(null);
-    } catch (err) {
-      console.error('Error processing anxiety risk data:', err);
-      setError('Failed to process data');
-    }
-    setIsLoading(false);
-  }, [data, activeDatasets, userPreferences]);
-
-  if (isLoading) return <div>Loading anxiety risk data...</div>;
+  if (loading) return <div>Loading anxiety risk data...</div>;
   if (error) return <div>Error: {error}</div>;
-  if (!chartData || !data.length) return <div>No anxiety risk data available</div>;
+  if (!chartData) return <div>No anxiety risk data available</div>;
+  if (Object.keys(algorithms).length === 0) {
+    return <div>No applicable anxiety risk algorithms available for your age group</div>;
+  }
 
   const options = {
     responsive: true,
@@ -226,9 +272,12 @@ const AnxietyRiskChart = ({ data, userPreferences }) => {
       x: {
         type: 'time',
         time: {
-          unit: 'day',
+          unit: selectedPeriod === 'WEEKLY' ? 'week' : 
+                selectedPeriod === 'MONTHLY_GENERAL' ? 'month' : 'quarter',
           displayFormats: {
-            day: 'MMM d'
+            week: 'MMM d',
+            month: 'MMM yyyy',
+            quarter: 'QQQ yyyy'
           }
         },
         title: {
@@ -238,7 +287,6 @@ const AnxietyRiskChart = ({ data, userPreferences }) => {
       },
       y: {
         beginAtZero: true,
-        max: 10,
         title: {
           display: true,
           text: 'Anxiety Risk Level'
@@ -247,16 +295,25 @@ const AnxietyRiskChart = ({ data, userPreferences }) => {
     },
     plugins: {
       legend: {
-        display: false
+        display: true,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12
+          }
+        }
       },
       tooltip: {
-        mode: 'index',
-        intersect: false,
         callbacks: {
-          label: function(context) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-            return `${label}: ${value.toFixed(1)} risk level`;
+          label: (context) => {
+            const data = context.raw;
+            return [
+              `Risk Score: ${data.y.toFixed(2)}`,
+              `Days PM2.5 > ${data.threshold}: ${data.daysExceeded}/${data.totalDays}`,
+              `Avg PM2.5: ${(data.pm25Values.reduce((a, b) => a + b, 0) / data.pm25Values.length).toFixed(1)}`
+            ];
           }
         }
       }
@@ -264,16 +321,68 @@ const AnxietyRiskChart = ({ data, userPreferences }) => {
   };
 
   return (
-    <div className="chart-container">
-      <div className="chart-side">
-        <div style={{ height: '400px', width: '100%' }}>
-          <Line data={chartData} options={options} />
+    <div className="anxiety-risk-analysis" style={{ 
+      width: '100%',
+      height: '100%',
+      padding: '16px',
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <div className="chart-container" style={{ 
+        flex: 1,
+        minHeight: '300px',
+        maxHeight: '400px',
+        width: '100%',
+        position: 'relative'
+      }}>
+        {chartData && <Line data={chartData} options={options} />}
+      </div>
+      
+      <div className="period-toggles" style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        marginTop: '16px',
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '8px'
+        }}>
+          {Object.entries(algorithms).map(([key, algo]) => (
+            <button
+              key={key}
+              onClick={() => setSelectedPeriod(key)}
+              style={{
+                padding: '8px 16px',
+                border: '2px solid var(--button-color)',
+                borderRadius: '20px',
+                background: selectedPeriod === key ? algo.color : 'transparent',
+                color: selectedPeriod === key ? '#fff' : algo.color,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '--button-color': algo.color
+              }}
+            >
+              {key.split('_')[0]}
+            </button>
+          ))}
         </div>
-        <ChartLegend 
-          activeDatasets={activeDatasets}
-          onToggle={toggleDataset}
-          userPreferences={userPreferences}
-        />
+        <div style={{
+          fontSize: '14px',
+          color: '#666',
+          textAlign: 'center',
+          minHeight: '20px',
+          padding: '8px'
+        }}>
+          {algorithms[selectedPeriod] && 
+           algorithmDescriptions[algorithms[selectedPeriod].code]}
+        </div>
       </div>
     </div>
   );

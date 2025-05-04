@@ -25,19 +25,19 @@ const App = () => {
   useEffect(() => {
     // Only check session if we have beta access
     if (localStorage.getItem('betaAccess') === 'true') {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setLoading(false);
-      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
 
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        setLoading(false);
-      });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
 
-      return () => subscription.unsubscribe();
+    return () => subscription.unsubscribe();
     } else {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ const App = () => {
   return (
     <Router>
       <div className="app">
-        <Routes>
+                <Routes>
           {/* Show splash page if no beta access */}
           <Route
             path="/"
@@ -69,9 +69,9 @@ const App = () => {
           {/* Public routes (only accessible with beta access) */}
           {hasBetaAccess && (
             <>
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             </>
           )}
 
@@ -94,7 +94,7 @@ const App = () => {
               element={<Navigate to={hasBetaAccess ? '/login' : '/'} />} 
             />
           )}
-        </Routes>
+          </Routes>
       </div>
     </Router>
   );

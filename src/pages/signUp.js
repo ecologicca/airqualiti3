@@ -8,6 +8,7 @@ const SignUp = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
@@ -26,9 +27,9 @@ const SignUp = () => {
 
       if (error) throw error;
 
-      // If signup successful, redirect to questionnaire
+      // Show confirmation email sent message
       if (data.user) {
-        navigate('/questionnaire', { state: { user: data.user } });
+        setConfirmationSent(true);
       }
     } catch (error) {
       setError(error.message);
@@ -36,6 +37,35 @@ const SignUp = () => {
       setLoading(false);
     }
   };
+
+  if (confirmationSent) {
+    return (
+      <div className="login-container">
+        <div className="container form-container">
+          <h2>Check Your Email</h2>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <p>We've sent a confirmation email to:</p>
+            <p style={{ 
+              fontWeight: 'bold', 
+              color: '#123522',
+              margin: '15px 0' 
+            }}>{email}</p>
+            <p>Click the link in the email to verify your account and continue setting up your profile.</p>
+            <button 
+              onClick={() => navigate('/login')} 
+              style={{
+                ...styles.button,
+                marginTop: '20px',
+                width: '100%'
+              }}
+            >
+              Return to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-container">
@@ -88,9 +118,7 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '1rem',
-    ':hover': {
-      backgroundColor: '#1a4d33',
-    },
+    width: '100%',
   },
 };
 

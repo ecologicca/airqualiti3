@@ -33,7 +33,7 @@ const Navbar = () => {
     <nav className="top-navbar">
       <div className="navbar-logo">
         <img src={logo} alt="Ecologicca" />
-      </div>
+        </div>
 
       <div className="navbar-right">
         <button className="navbar-icon-button">
@@ -46,13 +46,13 @@ const Navbar = () => {
           <button className="navbar-user-button" onClick={toggleDropdown}>
             <FaUserCircle />
           </button>
-          {dropdownOpen && (
+        {dropdownOpen && (
             <div className="navbar-dropdown">
               <button className="navbar-dropdown-item" onClick={handleLogout}>
                 Logout
               </button>
-            </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
     </nav>

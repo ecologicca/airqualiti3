@@ -24,12 +24,16 @@ const AuthCallback = () => {
           .single();
 
         if (!userPreferences) {
-          navigate('/questionnaire');
+          // If no preferences exist, redirect to questionnaire with user data
+          navigate('/questionnaire', { 
+            state: { user: session.user },
+            replace: true 
+          });
         } else {
-          navigate('/dashboard');
+          navigate('/dashboard', { replace: true });
         }
       } else {
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     };
 
@@ -38,7 +42,7 @@ const AuthCallback = () => {
 
   return (
     <div className="auth-callback-container">
-      <p>Completing authentication, please wait...</p>
+      <p>Verifying your email, please wait...</p>
     </div>
   );
 };

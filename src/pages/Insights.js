@@ -1,96 +1,90 @@
-import React from 'react';
-import { FaChartLine, FaCalendarAlt, FaExclamationTriangle } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import RiskChart from '../components/charts/RiskChart';
+import '../styles/Insights.css'
+import AnxietyRiskChart from '../components/charts/AnxietyRiskChart';
 
 const Insights = () => {
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No user found');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      const age = calculateAge(data.birthdate);
+      console.log('User birthdate:', data.birthdate);
+      console.log('Calculated age:', age);
+
+      setUserProfile({
+        ...data,
+        age: age
+      });
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to load user profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateAge = (birthdate) => {
+    if (!birthdate) return 0;
+    const birth = new Date(birthdate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  if (loading) return <div>Loading insights...</div>;
+  if (error) return <div>Error: {error}</div>;
+  if (!userProfile) return <div>Please complete your profile to view insights</div>;
+
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Insights</h1>
+    <div className="insights-container" style={{
+      padding: '24px',
+      maxWidth: '1200px',
+      margin: '0 auto'
+    }}>
+      <h1>Personal Health Insights</h1>
       
-      <div style={styles.cardsContainer}>
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <FaChartLine style={styles.icon} />
-            <h2 style={styles.cardTitle}>Trend Analysis</h2>
-          </div>
-          <p style={styles.cardDescription}>
-            View detailed analysis of your air quality trends and patterns over time.
-          </p>
+      <div className="insight-card" style={{
+        backgroundColor: '#fff',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <div className="insight-header" style={{
+          marginBottom: '20px'
+        }}>
+          <h2>Anxiety Risk Analysis</h2>
+          <p>Track how air quality affects your anxiety risk over different time periods</p>
         </div>
-
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <FaCalendarAlt style={styles.icon} />
-            <h2 style={styles.cardTitle}>Historical Data</h2>
-          </div>
-          <p style={styles.cardDescription}>
-            Access and compare historical air quality data across different time periods.
-          </p>
-        </div>
-
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <FaExclamationTriangle style={styles.icon} />
-            <h2 style={styles.cardTitle}>Risk Assessment</h2>
-          </div>
-          <p style={styles.cardDescription}>
-            Understand potential health risks based on your air quality exposure patterns.
-          </p>
-        </div>
+        <AnxietyRiskChart userPreferences={userProfile} />
       </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: '24px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-  },
-  title: {
-    color: '#043A24',
-    marginBottom: '32px',
-    fontSize: '28px',
-    fontWeight: '600',
-  },
-  cardsContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '24px',
-    marginTop: '24px',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 2px 4px rgba(4, 58, 36, 0.1)',
-    transition: 'transform 0.2s ease',
-    cursor: 'pointer',
-    '&:hover': {
-      transform: 'translateY(-4px)',
-    },
-  },
-  cardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: '16px',
-    gap: '12px',
-  },
-  icon: {
-    fontSize: '24px',
-    color: '#043A24',
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: '20px',
-    color: '#043A24',
-    fontWeight: '500',
-  },
-  cardDescription: {
-    margin: 0,
-    color: '#666',
-    lineHeight: '1.5',
-  },
 };
 
 export default Insights; 
