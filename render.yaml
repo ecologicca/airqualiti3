@@ -14,7 +14,17 @@ services:
       - key: OPENWEATHER_API_KEY
         sync: false  # Set this in Render dashboard
   - type: cron
-    name: airqualiti3-cron
+    name: airqualiti3-data-fetcher
     runtime: node
     schedule: "0 6,18 * * *"
-    buildCommand: curl -X POST https://airqualiti3-api.onrender.com/api/fetch-data 
+    buildCommand: npm install
+    startCommand: node server/services/dataFetcher.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WAQI_API_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false 
