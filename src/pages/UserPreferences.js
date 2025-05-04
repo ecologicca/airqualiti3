@@ -54,7 +54,7 @@ const UserPreferences = () => {
           .single();
 
         if (error) throw error;
-      
+
         if (data) {
         // Convert any null values to defaults
         setPreferences({
@@ -157,13 +157,21 @@ const UserPreferences = () => {
 
           <div className="form-group">
               <label>City</label>
-              <input
-                type="text"
+            <select
               value={preferences.city}
                 onChange={(e) => setPreferences({ ...preferences, city: e.target.value })}
-                className="form-input"
-                placeholder="Enter city"
-              />
+                className="form-select"
+              >
+                <option value="">Select a city</option>
+                <option value="Miami">Miami</option>
+                <option value="San Francisco">San Francisco</option>
+                <option value="Calgary">Calgary</option>
+                <option value="Edmonton">Edmonton</option>
+                <option value="Houston">Houston</option>
+                <option value="Boston">Boston</option>
+                <option value="New York">New York</option>
+                <option value="Toronto">Toronto</option>
+            </select>
             </div>
           </div>
 

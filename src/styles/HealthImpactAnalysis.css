@@ -23,6 +23,7 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
+  cursor: help;
 }
 
 .metric-title {
@@ -40,13 +41,14 @@
 .metric-details {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 1rem;
 }
 
 .impact-level {
   color: #043A24;
   font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .score-circle {
@@ -90,4 +92,39 @@
   .health-metric-card {
     padding: 1rem;
   }
+}
+
+.health-metric-tooltip {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  padding: 10px !important;
+  border-radius: 6px !important;
+}
+
+/* Add these new styles */
+.impact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.impact-bar-container {
+  width: 120px;
+  padding: 4px 0;
+}
+
+.impact-segments {
+  display: flex;
+  gap: 4px;
+  height: 6px;
+}
+
+.segment {
+  flex: 1;
+  height: 100%;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.segment.active {
+  opacity: 1;
 } 

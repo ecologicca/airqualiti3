@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient';
 import RiskChart from '../components/charts/RiskChart';
 import '../styles/Insights.css'
 import AnxietyRiskChart from '../components/charts/AnxietyRiskChart';
+import CognitiveRiskChart from '../components/charts/CognitiveRiskChart';
+import StressRiskChart from '../components/charts/StressRiskChart';
 
 const Insights = () => {
   const [userProfile, setUserProfile] = useState(null);
@@ -82,6 +84,36 @@ const Insights = () => {
           <p>Track how air quality affects your anxiety risk over different time periods</p>
         </div>
         <AnxietyRiskChart userPreferences={userProfile} />
+      </div>
+
+      <div className="insight-card" style={{
+        backgroundColor: '#fff',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <div className="insight-header" style={{
+          marginBottom: '20px'
+        }}>
+          <h2>Cognitive Function Risk Analysis</h2>
+          <p>Monitor long-term cognitive health risks based on 90-day rolling PM2.5 exposure</p>
+        </div>
+        <CognitiveRiskChart userPreferences={userProfile} />
+      </div>
+
+      <div className="insight-card" style={{
+        backgroundColor: '#fff',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <div className="insight-header" style={{
+          marginBottom: '20px'
+        }}>
+          <h2>Stress Risk Analysis</h2>
+          <p>Monitor chronic stress risk based on long-term PM2.5 exposure patterns</p>
+        </div>
+        <StressRiskChart userPreferences={userProfile} />
       </div>
     </div>
   );

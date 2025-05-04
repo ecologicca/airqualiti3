@@ -2,24 +2,21 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { supabase } = require('../db/database');
 
+// Use the same list of supported cities
+const SUPPORTED_CITIES = [
+  'Boston',
+  'Calgary',
+  'Dallas',
+  'Edmonton',
+  'Houston',
+  'Miami',
+  'New York',
+  'San Francisco',
+  'Toronto'
+];
+
 async function getCities() {
-    try {
-        const { data, error } = await supabase
-            .from('user_preferences')
-            .select('city');
-        
-        if (error) {
-            console.error('Error fetching cities:', error);
-            return [];
-        }
-        
-        // Get unique cities
-        const uniqueCities = [...new Set(data.map(item => item.city))];
-        return uniqueCities;
-    } catch (error) {
-        console.error('Error in getCities:', error);
-        return [];
-    }
+  return SUPPORTED_CITIES;
 }
 
 async function fetchHistoricalData(city, date) {

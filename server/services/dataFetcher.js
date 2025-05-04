@@ -73,16 +73,17 @@ async function fetchAirQualityData(city) {
         let so2 = data.data?.iaqi?.so2?.v || null;
         let co = data.data?.iaqi?.co?.v || null;
 
-        // If PM2.5 is null, try OpenWeather
-        if (pm25 === null) {
-            console.log(`PM2.5 data missing for ${city}, trying OpenWeather...`);
+        // If either PM2.5 or PM10 is null, try OpenWeather
+        if (pm25 === null || pm10 === null) {
+            console.log(`PM2.5 or PM10 data missing for ${city}, trying OpenWeather...`);
             const owData = await fetchOpenWeatherAirQuality(city);
             if (owData) {
-                pm25 = owData.pm25;
-                pm10 = pm10 || owData.pm10;
-                no2 = no2 || owData.no2;
-                so2 = so2 || owData.so2;
-                co = co || owData.co;
+                // Only replace null values
+                pm25 = pm25 === null ? owData.pm25 : pm25;
+                pm10 = pm10 === null ? owData.pm10 : pm10;
+                no2 = no2 === null ? owData.no2 : no2;
+                so2 = so2 === null ? owData.so2 : so2;
+                co = co === null ? owData.co : co;
             }
         }
 
@@ -111,7 +112,7 @@ async function fetchAirQualityData(city) {
                 created_at: new Date().toISOString(),
                 pm25: parseFloat(owData.pm25),
                 pm10: parseFloat(owData.pm10),
-                air_quality: null, // OpenWeather doesn't provide AQI in the same format
+                air_quality: null,
                 temp: null,
                 co: parseFloat(owData.co),
                 no2: parseFloat(owData.no2),

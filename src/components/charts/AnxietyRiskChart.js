@@ -114,6 +114,7 @@ const AnxietyRiskChart = ({ userPreferences }) => {
   const [error, setError] = useState(null);
   const [algorithms, setAlgorithms] = useState({});
   const [algorithmDescriptions, setAlgorithmDescriptions] = useState({});
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Fetch algorithm descriptions from Supabase
   useEffect(() => {
@@ -159,7 +160,13 @@ const AnxietyRiskChart = ({ userPreferences }) => {
     setAlgorithms(filteredAlgos);
   }, [userPreferences?.birthdate]);
 
-  // Fetch and process data
+  // Add rolling average calculation
+  const calculateRollingAverage = (data, index, periodDays) => {
+    const windowData = data.slice(Math.max(0, index - periodDays + 1), index + 1);
+    return windowData.reduce((sum, day) => sum + parseFloat(day.pm25 || 0), 0) / windowData.length;
+  };
+
+  // Modify the data processing in useEffect
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -197,54 +204,59 @@ const AnxietyRiskChart = ({ userPreferences }) => {
           return;
         }
 
-        console.log('Fetched PM2.5 data:', pmData);
+        const periodDays = currentAlgo.period_days;
 
-        // Process data into periods
-        const periodData = [];
-        for (let i = 0; i < pmData.length; i += currentAlgo.period_days) {
-          const periodSlice = pmData.slice(i, i + currentAlgo.period_days);
-          const startDate = new Date(periodSlice[0].created_at);
+        // Calculate risk scores with rolling averages
+        const data = pmData.map((_, index) => {
+          const rollingAvg = calculateRollingAverage(pmData, index, periodDays);
+          const baseLevel = userPreferences.anxiety_base_level || 5;
+          const hasHVAC = userPreferences.has_HVAC;
+          const hasAirPurifier = userPreferences.has_ecologgica;
           
-          const daysExceeded = periodSlice.filter(day => day.pm25 > currentAlgo.threshold).length;
-          const baseRisk = userPreferences.anxiety_base_level || 5;
-          const riskIncrease = (daysExceeded / currentAlgo.period_days) * currentAlgo.base_ratio;
-          const riskScore = baseRisk * (1 + riskIncrease);
+          const riskScore = calculateAnxietyRisk(
+            baseLevel,
+            rollingAvg,
+            hasHVAC,
+            hasAirPurifier
+          );
 
-          periodData.push({
-            x: startDate,
+          return {
+            x: new Date(pmData[index].created_at),
             y: riskScore,
-            daysExceeded,
-            totalDays: periodSlice.length,
-            threshold: currentAlgo.threshold,
-            pm25Values: periodSlice.map(d => d.pm25)
-          });
-        }
-
-        console.log('Processed period data:', periodData);
+            raw: {
+              pm25: pmData[index].pm25,
+              rolling_average: rollingAvg,
+              base_level: baseLevel,
+              adjustments: {
+                hvac: hasHVAC ? '30% reduction' : 'none',
+                purifier: hasAirPurifier ? '40% reduction' : 'none'
+              }
+            }
+          };
+        });
 
         setChartData({
-          labels: periodData.map(period => period.x),
           datasets: [{
-            label: `${selectedPeriod.split('_')[0].charAt(0) + selectedPeriod.split('_')[0].slice(1).toLowerCase()} Anxiety Risk`,
-            data: periodData,
+            label: currentAlgo.description,
+            data: data,
             borderColor: currentAlgo.color,
             backgroundColor: `${currentAlgo.color}20`,
-            borderWidth: 2,
-            tension: 0.1,
             fill: true
           }]
         });
 
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data');
+        console.error('Error fetching anxiety risk data:', err);
+        setError('Failed to load anxiety risk data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [algorithms, selectedPeriod, userPreferences?.city]);
+    if (userPreferences?.city) {
+      fetchData();
+    }
+  }, [userPreferences, selectedPeriod, algorithms]);
 
   const calculateAge = (birthdate) => {
     if (!birthdate) return 0;
@@ -311,8 +323,11 @@ const AnxietyRiskChart = ({ userPreferences }) => {
             const data = context.raw;
             return [
               `Risk Score: ${data.y.toFixed(2)}`,
-              `Days PM2.5 > ${data.threshold}: ${data.daysExceeded}/${data.totalDays}`,
-              `Avg PM2.5: ${(data.pm25Values.reduce((a, b) => a + b, 0) / data.pm25Values.length).toFixed(1)}`
+              `Daily PM2.5: ${data.raw.pm25.toFixed(1)} μg/m³`,
+              `${selectedPeriod.split('_')[0]} Average: ${data.raw.rolling_average.toFixed(1)} μg/m³`,
+              `Base Anxiety Level: ${data.raw.base_level}`,
+              `HVAC: ${data.raw.adjustments.hvac}`,
+              `Air Purifier: ${data.raw.adjustments.purifier}`
             ];
           }
         }
@@ -338,6 +353,76 @@ const AnxietyRiskChart = ({ userPreferences }) => {
         width: '100%',
         position: 'relative'
       }}>
+        {/* Add information tooltip */}
+        <div 
+          className="info-tooltip-trigger"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          style={{ 
+            position: 'absolute', 
+            right: '1rem', 
+            top: '1rem',
+            cursor: 'help',
+            zIndex: 1
+          }}
+        >
+          ℹ️
+          {showTooltip && (
+            <div className="info-tooltip" style={{
+              position: 'absolute',
+              right: '2rem',
+              top: '0',
+              background: 'white',
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              width: '300px',
+              zIndex: 10
+            }}>
+              <h4>Anxiety Risk Score Calculation</h4>
+              <p>This score is calculated using:</p>
+              <ul>
+                <li>Age-specific algorithms:
+                  <ul>
+                    <li>Weekly (anxSym96): Optimized for seniors 65+</li>
+                    <li>Monthly (anxSym961): Suitable for all ages</li>
+                    <li>Quarterly (anxDis32): Suitable for all ages</li>
+                  </ul>
+                </li>
+                <li>Your profile:
+                  <ul>
+                    <li>Age: {calculateAge(userPreferences.birthdate)} years</li>
+                    <li>Base anxiety level: {userPreferences.anxiety_base_level || 5}</li>
+                  </ul>
+                </li>
+                <li>Rolling average of PM2.5 levels:
+                  <ul>
+                    <li>Weekly: 7-day average</li>
+                    <li>Monthly: 30-day average</li>
+                    <li>Quarterly: 90-day average</li>
+                  </ul>
+                </li>
+                <li>Indoor air quality improvements:
+                  <ul>
+                    <li>HVAC system: 30% reduction</li>
+                    <li>Air purifier: Additional 40% reduction</li>
+                  </ul>
+                </li>
+                <li>Risk adjustments:
+                  <ul>
+                    <li>Increases up to 12% per 10 μg/m³ above threshold</li>
+                    <li>Decreases up to 10% when below threshold</li>
+                  </ul>
+                </li>
+              </ul>
+              <p style={{ fontSize: '0.9em', marginTop: '0.5rem', color: '#666' }}>
+                Note: Some algorithms are age-specific. For example, the weekly analysis (anxSym96) 
+                is only shown for users 65 and older, as research shows stronger correlations 
+                between air quality and anxiety symptoms in this age group.
+              </p>
+            </div>
+          )}
+        </div>
         {chartData && <Line data={chartData} options={options} />}
       </div>
       
@@ -349,7 +434,7 @@ const AnxietyRiskChart = ({ userPreferences }) => {
         flexDirection: 'column',
         alignItems: 'center'
       }}>
-        <div style={{
+        <div style={{ 
           display: 'flex',
           gap: '10px',
           marginBottom: '8px'

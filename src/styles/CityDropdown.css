@@ -1,0 +1,61 @@
+.city-dropdown-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.city-dropdown-container label {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.city-dropdown {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  width: 100%;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.city-dropdown:hover {
+  border-color: #90c789;
+}
+
+.city-dropdown:focus {
+  outline: none;
+  border-color: #043A24;
+  box-shadow: 0 0 0 2px rgba(4, 58, 36, 0.1);
+}
+
+.city-dropdown-loading {
+  padding: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.city-dropdown-error {
+  padding: 12px;
+  color: #d32f2f;
+  font-size: 0.875rem;
+}
+
+/* Style for the dropdown arrow */
+.city-dropdown {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* Disabled state */
+.city-dropdown:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+} 

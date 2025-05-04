@@ -1,0 +1,7 @@
+2025-05-04T18:00:00.110Z: Cron job started (Schedule: 0 18 * * *)
+2025-05-04T18:00:00.131Z: === Starting weather data fetch (triggered by: cron) ===
+2025-05-04T18:00:01.897Z: Fetch successful!
+2025-05-04T18:00:01.898Z: Cities updated: 
+2025-05-04T18:00:01.899Z: Total records: 0
+2025-05-04T18:00:01.899Z: === Weather data fetch complete ===
+

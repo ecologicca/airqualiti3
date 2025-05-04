@@ -74,71 +74,71 @@ const Questionnaire = () => {
         
         <form onSubmit={handleSubmit} className="preferences-form">
           <div className="form-row">
-            <div className="form-group">
-              <label>First Name</label>
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+          <div className="form-group">
+            <label>First Name</label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
                 className="form-input"
                 placeholder="Enter first name"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Last Name</label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Last Name</label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
                 className="form-input"
                 placeholder="Enter last name"
-                required
-              />
+              required
+            />
             </div>
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label>Birth Date</label>
-              <input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+          <div className="form-group">
+            <label>Birth Date</label>
+            <input
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
                 className="form-input"
-                required
-              />
-            </div>
+              required
+            />
+          </div>
 
-            <div className="form-group">
+          <div className="form-group">
               <label>City</label>
-              <select 
-                value={city} 
-                onChange={(e) => setCity(e.target.value)}
+            <select 
+              value={city} 
+              onChange={(e) => setCity(e.target.value)} 
                 className="form-select"
-                required
-              >
-                <option value="">Select a city</option>
-                <option value="Toronto">Toronto</option>
-                <option value="New York">New York</option>
-                <option value="San Francisco">San Francisco</option>
-                <option value="Dallas">Dallas</option>
-                <option value="Boston">Boston</option>
-                <option value="Miami">Miami</option>
-                <option value="Houston">Houston</option>
-              </select>
+              required
+            >
+              <option value="">Select a city</option>
+              <option value="Toronto">Toronto</option>
+              <option value="New York">New York</option>
+              <option value="San Francisco">San Francisco</option>
+              <option value="Dallas">Dallas</option>
+              <option value="Boston">Boston</option>
+              <option value="Miami">Miami</option>
+              <option value="Houston">Houston</option>
+            </select>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
               <label>Anxiety Base Level: {anxietyLevel}</label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={anxietyLevel}
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={anxietyLevel}
                 onChange={(e) => setAnxietyLevel(parseInt(e.target.value))}
                 className="form-slider"
               />
@@ -171,8 +171,8 @@ const Questionnaire = () => {
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
+              </div>
+              </div>
 
           <div className="form-group checkbox-group">
             <label className="checkbox-label">

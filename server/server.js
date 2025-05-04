@@ -25,50 +25,53 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
-// Function to log to file
-const logToFile = (message) => {
-  const date = new Date().toISOString().split('T')[0];
-  const logFile = path.join(logsDir, `cron-${date}.log`);
-  const timestamp = new Date().toISOString();
-  const logMessage = `${timestamp}: ${message}\n`;
-  
-  fs.appendFileSync(logFile, logMessage);
-  console.log(message); // Also log to console
-};
-
 // Track last fetch time to prevent duplicate calls
 let lastFetchTime = 0;
-const MINIMUM_FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const MINIMUM_FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
-// Function to fetch and store weather data with logging
+// Function to fetch and store weather data with retries
 const fetchAndLogWeatherData = async (trigger = 'cron') => {
   const now = Date.now();
   
-  // Prevent fetching if it's been less than 5 minutes since last fetch
+  // Prevent fetching if it's been less than 5 minutes
   if (now - lastFetchTime < MINIMUM_FETCH_INTERVAL) {
-    logToFile(`Skipping fetch - last fetch was ${Math.round((now - lastFetchTime) / 1000)} seconds ago`);
+    console.log(`Skipping fetch - last fetch was ${Math.round((now - lastFetchTime) / 1000)} seconds ago`);
     return;
   }
   
-  try {
-    logToFile(`=== Starting weather data fetch (triggered by: ${trigger}) ===`);
-    lastFetchTime = now;
-    
-    const result = await manualFetch();
-    
-    if (result.success) {
-      logToFile('Fetch successful!');
-      logToFile('Cities updated: ' + result.cities.join(', '));
-      logToFile('=== Weather data fetch complete ===\n');
-      return result;
-    } else {
-      throw new Error(result.error);
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+  
+  while (retryCount < MAX_RETRIES) {
+    try {
+      console.log(`=== Starting weather data fetch (triggered by: ${trigger}) [Attempt ${retryCount + 1}/${MAX_RETRIES}] ===`);
+      lastFetchTime = now;
+      
+      const result = await manualFetch();
+      
+      if (result.success) {
+        console.log('Fetch successful!');
+        console.log(`Cities updated: ${result.citiesProcessed.join(', ')}`);
+        console.log(`Total records: ${result.storedDataCount}`);
+        console.log('=== Weather data fetch complete ===\n');
+        return result;
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      retryCount++;
+      console.error(`!!! Attempt ${retryCount}/${MAX_RETRIES} failed !!!`);
+      console.error('Error: ' + error.message);
+      
+      if (retryCount < MAX_RETRIES) {
+        const delay = retryCount * 30000; // Exponential backoff: 30s, 60s, 90s
+        console.log(`Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('!!! All retry attempts failed !!!\n');
+        throw error;
+      }
     }
-  } catch (error) {
-    logToFile(`!!! ${trigger} fetch failed !!!`);
-    logToFile('Error: ' + error.message);
-    logToFile('!!! End of error report !!!\n');
-    throw error;
   }
 };
 
@@ -161,6 +164,18 @@ app.get('/api/test-fetch', async (req, res) => {
   }
 });
 
+// Add this route to handle cron job triggers
+app.post('/api/fetch-data', async (req, res) => {
+  try {
+    console.log('Manual data fetch triggered by cron job');
+    await fetchAndLogWeatherData('cron');
+    res.json({ success: true, message: 'Data fetch completed' });
+  } catch (error) {
+    console.error(`Error in manual data fetch: ${error.message}`);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Handle React routing, return all requests to React app
 app.get('*', function(req, res) {
     // Skip API routes
@@ -170,55 +185,51 @@ app.get('*', function(req, res) {
     res.sendFile(path.join(__dirname, '../build', 'index.html'));
 });
 
-// Schedule data fetching twice per day at 6 AM and 6 PM UTC
-const cronSchedules = ['0 6 * * *', '0 18 * * *'];
+// Schedule data fetching twice per day
+const schedules = [
+  { time: '0 6 * * *', label: 'Morning' },  // 6:00 UTC
+  { time: '0 18 * * *', label: 'Evening' }  // 18:00 UTC
+];
 
-cron.schedule(cronSchedules[0], async () => {
-  try {
-    logToFile(`Cron job started (Schedule: ${cronSchedules[0]})`);
-    await fetchAndLogWeatherData('cron');
-  } catch (error) {
-    // Error is already logged in fetchAndLogWeatherData
-  }
-}, {
-  timezone: 'UTC'
-});
-
-cron.schedule(cronSchedules[1], async () => {
-  try {
-    logToFile(`Cron job started (Schedule: ${cronSchedules[1]})`);
-    await fetchAndLogWeatherData('cron');
-  } catch (error) {
-    // Error is already logged in fetchAndLogWeatherData
-  }
-}, {
-  timezone: 'UTC'
-});
-
-// Initial fetch with proper delay and retry
-const initialFetch = async (retryCount = 0) => {
-  try {
-    logToFile('Attempting initial data fetch...');
-    await fetchAndLogWeatherData('server-start');
-    logToFile('Initial fetch successful');
-  } catch (error) {
-    if (retryCount < 3) {
-      const delay = (retryCount + 1) * 60000; // Increase delay with each retry
-      logToFile(`Initial fetch failed, retrying in ${delay/1000} seconds...`);
-      setTimeout(() => initialFetch(retryCount + 1), delay);
-    } else {
-      logToFile('Initial fetch failed after 3 attempts');
+// Initialize cron jobs with error handling
+schedules.forEach(({ time, label }) => {
+  cron.schedule(time, async () => {
+    try {
+      console.log(`${label} cron job started (Schedule: ${time})`);
+      await fetchAndLogWeatherData('cron');
+    } catch (error) {
+      console.error(`${label} cron job failed: ${error.message}`);
     }
-  }
-};
+  }, {
+    timezone: 'UTC',
+    scheduled: true,
+    runOnInit: false // Don't run immediately on server start
+  });
+});
 
-// Wait 2 minutes before initial fetch to ensure everything is properly initialized
-setTimeout(() => initialFetch(), 120000);
-
+// Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  logToFile(`Server running on port ${PORT}`);
-  logToFile('Cron schedules (UTC):');
-  logToFile(`- ${cronSchedules[0]}`);
-  logToFile(`- ${cronSchedules[1]}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log('Cron schedules (UTC):');
+  schedules.forEach(({ time, label }) => {
+    console.log(`- ${label}: ${time}`);
+  });
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 }); 
