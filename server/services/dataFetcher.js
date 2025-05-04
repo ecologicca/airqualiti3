@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const axios = require('axios');
 const cron = require('node-cron');
 const { supabase } = require('../db/database');
 const AppError = require('../utils/AppError');
@@ -14,53 +15,111 @@ const SUPPORTED_CITIES = [
   'Toronto'
 ];
 
+// Add OpenWeather API configuration
+const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
+const OPENWEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+
 async function getCities() {
   return SUPPORTED_CITIES;
 }
 
+// Add function to get coordinates for a city
+async function getLocationCoords(city) {
+    const response = await axios.get(
+        `http://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${OPENWEATHER_API_KEY}`
+    );
+    return response.data[0];
+}
+
+// Add function to fetch OpenWeather air quality data
+async function fetchOpenWeatherAirQuality(city) {
+    try {
+        const coords = await getLocationCoords(city);
+        if (!coords) {
+            console.log(`No coordinates found for ${city}`);
+            return null;
+        }
+
+        const response = await axios.get(
+            `${OPENWEATHER_BASE_URL}/air_pollution?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}`
+        );
+
+        return {
+            pm25: response.data.list[0].components.pm2_5,
+            pm10: response.data.list[0].components.pm10,
+            no2: response.data.list[0].components.no2,
+            so2: response.data.list[0].components.so2,
+            co: response.data.list[0].components.co
+        };
+    } catch (error) {
+        console.error(`Error fetching OpenWeather data for ${city}:`, error);
+        return null;
+    }
+}
+
+// Modify the existing fetchAirQualityData function
 async function fetchAirQualityData(city) {
     try {
-        // Add delay between requests to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
+        // Try WAQI first
         const response = await fetch(
             `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
         );
         
-        if (response.status === 429) {
-            await new Promise(resolve => setTimeout(resolve, 30000));
-            throw new AppError('WAQI API rate limit exceeded, retrying after delay', 429);
-        }
-        
         const data = await response.json();
         
-        if (data.status !== 'ok') {
-            if (data.data === 'Over quota') {
-                console.log('WAQI API quota exceeded, will retry next hour');
-                throw new AppError('WAQI API quota exceeded', 429);
+        let pm25 = data.data?.iaqi?.pm25?.v || null;
+        let pm10 = data.data?.iaqi?.pm10?.v || null;
+        let no2 = data.data?.iaqi?.no2?.v || null;
+        let so2 = data.data?.iaqi?.so2?.v || null;
+        let co = data.data?.iaqi?.co?.v || null;
+
+        // If PM2.5 is null, try OpenWeather
+        if (pm25 === null) {
+            console.log(`PM2.5 data missing for ${city}, trying OpenWeather...`);
+            const owData = await fetchOpenWeatherAirQuality(city);
+            if (owData) {
+                pm25 = owData.pm25;
+                pm10 = pm10 || owData.pm10;
+                no2 = no2 || owData.no2;
+                so2 = so2 || owData.so2;
+                co = co || owData.co;
             }
-            throw new Error(`Failed to fetch data for ${city}: ${data.data}`);
         }
 
-        // Map data to match database schema
         return {
             city: city,
-            station_id: data.data.idx ? parseInt(data.data.idx) : null,
-            created_at: data.data.time?.s || new Date().toISOString(),
-            pm25: data.data.iaqi.pm25?.v ? parseFloat(data.data.iaqi.pm25.v) : null,
-            pm10: data.data.iaqi.pm10?.v ? parseFloat(data.data.iaqi.pm10.v) : null,
-            air_quality: data.data.aqi ? data.data.aqi.toString() : null,
-            temp: data.data.iaqi.t?.v ? data.data.iaqi.t.v.toString() : null,
-            co: data.data.iaqi.co?.v ? parseFloat(data.data.iaqi.co.v) : null,
-            no2: data.data.iaqi.no2?.v ? parseFloat(data.data.iaqi.no2.v) : null,
-            so2: data.data.iaqi.so2?.v ? parseFloat(data.data.iaqi.so2.v) : null
+            station_id: data.data?.idx || null,
+            created_at: data.data?.time?.s || new Date().toISOString(),
+            pm25: pm25 ? parseFloat(pm25) : null,
+            pm10: pm10 ? parseFloat(pm10) : null,
+            air_quality: data.data?.aqi?.toString() || null,
+            temp: data.data?.iaqi?.t?.v?.toString() || null,
+            co: co ? parseFloat(co) : null,
+            no2: no2 ? parseFloat(no2) : null,
+            so2: so2 ? parseFloat(so2) : null
         };
     } catch (error) {
-        if (error instanceof AppError) {
-            throw error;
-        }
         console.error(`Error fetching data for ${city}:`, error);
-        throw new AppError(`Failed to fetch data for ${city}`, 500);
+        
+        // Try OpenWeather as complete fallback
+        console.log(`Trying OpenWeather as complete fallback for ${city}...`);
+        const owData = await fetchOpenWeatherAirQuality(city);
+        if (owData) {
+            return {
+                city: city,
+                station_id: null,
+                created_at: new Date().toISOString(),
+                pm25: parseFloat(owData.pm25),
+                pm10: parseFloat(owData.pm10),
+                air_quality: null, // OpenWeather doesn't provide AQI in the same format
+                temp: null,
+                co: parseFloat(owData.co),
+                no2: parseFloat(owData.no2),
+                so2: parseFloat(owData.so2)
+            };
+        }
+        
+        throw new AppError(`Failed to fetch data for ${city} from both sources`, 500);
     }
 }
 
@@ -85,20 +144,34 @@ async function storeDataInSupabase(data) {
             throw new Error('No valid data to insert');
         }
 
+        // Log the exact data being sent to Supabase
+        console.log('Validated data for insertion:', JSON.stringify(validData, null, 2));
+
         const { data: insertedData, error } = await supabase
             .from('weather_data')
             .insert(validData)
             .select(); // Add this to get back the inserted data
 
         if (error) {
-            console.error('Supabase insertion error:', error);
-            throw new AppError('Failed to store data in database', 500);
+            // Log more details about the error
+            console.error('Supabase insertion error details:', {
+                code: error.code,
+                message: error.message,
+                details: error.details,
+                hint: error.hint
+            });
+            throw new AppError(`Failed to store data in database: ${error.message}`, 500);
         }
 
         console.log('Successfully stored data. Inserted rows:', insertedData.length);
         return insertedData;
     } catch (error) {
-        console.error('Error in storeDataInSupabase:', error);
+        console.error('Full error in storeDataInSupabase:', {
+            message: error.message,
+            stack: error.stack,
+            details: error.details,
+            code: error.code
+        });
         throw error;
     }
 }
