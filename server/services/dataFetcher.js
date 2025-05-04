@@ -1,35 +1,34 @@
+const fetch = require('node-fetch');
 const cron = require('node-cron');
 const { supabase } = require('../db/database');
 const AppError = require('../utils/AppError');
+const SUPPORTED_CITIES = [
+  'Boston',
+  'Calgary',
+  'Dallas',
+  'Edmonton',
+  'Houston',
+  'Miami',
+  'New York',
+  'San Francisco',
+  'Toronto'
+];
 
-// Get cities from user_preferences table
 async function getCities() {
-    const { data, error } = await supabase
-        .from('user_preferences')
-        .select('city', { count: 'exact', head: false })
-        .is('city', 'not.null');
-    
-    if (error) {
-        throw new AppError('Failed to fetch cities', 500);
-    }
-    
-    // Get unique cities using Set
-    const uniqueCities = [...new Set(data.map(item => item.city))];
-    return uniqueCities;
+  return SUPPORTED_CITIES;
 }
 
 async function fetchAirQualityData(city) {
     try {
         // Add delay between requests to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         const response = await fetch(
             `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
         );
         
         if (response.status === 429) {
-            // Wait longer if we hit rate limit
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 30000));
             throw new AppError('WAQI API rate limit exceeded, retrying after delay', 429);
         }
         
@@ -37,21 +36,25 @@ async function fetchAirQualityData(city) {
         
         if (data.status !== 'ok') {
             if (data.data === 'Over quota') {
-                logToFile('WAQI API quota exceeded, will retry next hour');
+                console.log('WAQI API quota exceeded, will retry next hour');
                 throw new AppError('WAQI API quota exceeded', 429);
             }
             throw new Error(`Failed to fetch data for ${city}: ${data.data}`);
         }
 
+        // Map data to match database schema
         return {
-            city,
+            city: city,
+            station_id: data.data.idx || null,
+            created_at: data.data.time?.s || new Date().toISOString(), // Use API timestamp if available
             pm25: parseFloat(data.data.iaqi.pm25?.v) || null,
             pm10: parseFloat(data.data.iaqi.pm10?.v) || null,
-            temp: parseFloat(data.data.iaqi.t?.v) || null,
-            co: parseFloat(data.data.iaqi.co?.v) || null,    // float8
-            o3: parseFloat(data.data.iaqi.o3?.v) || null,    // float8
-            aqi: parseInt(data.data.aqi) || null,            // int2
-            created_at: new Date().toISOString()
+            air_quality: data.data.aqi?.toString() || null, // Map AQI to air_quality as text
+            o3: parseFloat(data.data.iaqi.o3?.v) || null,
+            co: parseFloat(data.data.iaqi.co?.v) || null,
+            no2: parseFloat(data.data.iaqi.no2?.v) || null,
+            so2: parseFloat(data.data.iaqi.so2?.v) || null,
+            temp: data.data.iaqi.t?.v?.toString() || null // Keep temp as text as per schema
         };
     } catch (error) {
         if (error instanceof AppError) {
@@ -70,8 +73,7 @@ async function storeDataInSupabase(data) {
         const validData = data.filter(item => {
             const isValid = item && item.city && 
                           (item.pm25 !== null || item.pm10 !== null || 
-                           item.temp !== null || item.co !== null || 
-                           item.o3 !== null || item.aqi !== null);
+                           item.air_quality !== null);
             
             if (!isValid) {
                 console.warn('Invalid data item:', item);
@@ -107,12 +109,8 @@ async function manualFetch() {
         console.log('Starting manual data fetch...');
         
         const cities = await getCities();
-        console.log('Found cities:', cities);
+        console.log('Fetching data for cities:', cities);
         
-        if (!cities || cities.length === 0) {
-            throw new Error('No cities found to fetch data for');
-        }
-
         const results = [];
         // Fetch cities sequentially to avoid rate limits
         for (const city of cities) {
