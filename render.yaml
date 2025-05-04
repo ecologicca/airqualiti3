@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: airqualiti3-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WAQI_API_TOKEN
+        sync: false # This will be set manually in Render dashboard
+  - type: cron
+    name: airqualiti3-cron
+    runtime: node
+    schedule: "0 6,18 * * *"
+    buildCommand: curl -X POST https://airqualiti3-api.onrender.com/api/fetch-data 
