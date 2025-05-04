@@ -17,7 +17,6 @@ services:
     name: airqualiti3-data-fetcher
     runtime: node
     schedule: "0 6,18 * * *"
-    buildCommand: npm install
     startCommand: node server/services/dataFetcher.js
     envVars:
       - key: NODE_ENV
