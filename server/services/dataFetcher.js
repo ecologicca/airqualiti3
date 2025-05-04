@@ -131,9 +131,9 @@ async function storeDataInSupabase(data) {
         // Validate data before insertion
         const validData = data.filter(item => {
             const isValid = item && 
-                            item.city && 
-                            (item.pm25 !== null || 
-                             item.air_quality !== null);
+                          item.city && 
+                          (item.pm25 !== null || 
+                           item.air_quality !== null);
             
             if (!isValid) {
                 console.warn('Invalid data item:', item);
@@ -145,16 +145,25 @@ async function storeDataInSupabase(data) {
             throw new Error('No valid data to insert');
         }
 
-        // Log the exact data being sent to Supabase
-        console.log('Validated data for insertion:', JSON.stringify(validData, null, 2));
+        // Round timestamps to the nearest hour to avoid duplicate entries
+        const processedData = validData.map(item => ({
+            ...item,
+            created_at: new Date(new Date(item.created_at).setMinutes(0, 0, 0)).toISOString()
+        }));
 
+        // Log the exact data being sent to Supabase
+        console.log('Processed data for insertion:', JSON.stringify(processedData, null, 2));
+
+        // Use upsert instead of insert to handle duplicates
         const { data: insertedData, error } = await supabase
             .from('weather_data')
-            .insert(validData)
-            .select(); // Add this to get back the inserted data
+            .upsert(processedData, {
+                onConflict: 'created_at,city',
+                ignoreDuplicates: true
+            })
+            .select();
 
         if (error) {
-            // Log more details about the error
             console.error('Supabase insertion error details:', {
                 code: error.code,
                 message: error.message,
@@ -164,7 +173,7 @@ async function storeDataInSupabase(data) {
             throw new AppError(`Failed to store data in database: ${error.message}`, 500);
         }
 
-        console.log('Successfully stored data. Inserted rows:', insertedData.length);
+        console.log('Successfully stored data. Inserted/updated rows:', insertedData?.length || 0);
         return insertedData;
     } catch (error) {
         console.error('Full error in storeDataInSupabase:', {
