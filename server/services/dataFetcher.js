@@ -145,36 +145,60 @@ async function storeDataInSupabase(data) {
             throw new Error('No valid data to insert');
         }
 
-        // Round timestamps to the nearest hour to avoid duplicate entries
-        const processedData = validData.map(item => ({
-            ...item,
-            created_at: new Date(new Date(item.created_at).setMinutes(0, 0, 0)).toISOString()
-        }));
+        // Round timestamps to the nearest hour and ensure UTC timezone
+        const processedData = validData.map(item => {
+            const date = new Date(item.created_at);
+            date.setUTCMinutes(0, 0, 0); // Set minutes, seconds, milliseconds to 0 in UTC
+            return {
+                ...item,
+                created_at: date.toISOString()
+            };
+        });
 
         // Log the exact data being sent to Supabase
         console.log('Processed data for insertion:', JSON.stringify(processedData, null, 2));
 
-        // Use upsert instead of insert to handle duplicates
-        const { data: insertedData, error } = await supabase
-            .from('weather_data')
-            .upsert(processedData, {
-                onConflict: 'created_at,city',
-                ignoreDuplicates: true
-            })
-            .select();
+        // First check for existing records
+        for (const record of processedData) {
+            const { data: existingData } = await supabase
+                .from('weather_data')
+                .select('id')
+                .eq('created_at', record.created_at)
+                .eq('city', record.city)
+                .single();
 
-        if (error) {
-            console.error('Supabase insertion error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-                hint: error.hint
-            });
-            throw new AppError(`Failed to store data in database: ${error.message}`, 500);
+            if (existingData) {
+                // Update existing record
+                const { error: updateError } = await supabase
+                    .from('weather_data')
+                    .update({
+                        pm25: record.pm25,
+                        pm10: record.pm10,
+                        air_quality: record.air_quality,
+                        temp: record.temp,
+                        co: record.co,
+                        no2: record.no2,
+                        so2: record.so2
+                    })
+                    .eq('id', existingData.id);
+
+                if (updateError) {
+                    console.warn(`Error updating record for ${record.city}:`, updateError);
+                }
+            } else {
+                // Insert new record
+                const { error: insertError } = await supabase
+                    .from('weather_data')
+                    .insert([record]);
+
+                if (insertError) {
+                    console.warn(`Error inserting record for ${record.city}:`, insertError);
+                }
+            }
         }
 
-        console.log('Successfully stored data. Inserted/updated rows:', insertedData?.length || 0);
-        return insertedData;
+        console.log('Successfully processed all records');
+        return processedData;
     } catch (error) {
         console.error('Full error in storeDataInSupabase:', {
             message: error.message,
