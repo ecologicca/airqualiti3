@@ -2,7 +2,6 @@ services:
   - type: web
     name: airqualiti3-api
     runtime: node
-    buildCommand: npm install
     startCommand: node server/server.js
     envVars:
       - key: NODE_ENV
