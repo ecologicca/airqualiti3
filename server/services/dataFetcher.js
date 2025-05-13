@@ -57,70 +57,94 @@ async function fetchOpenWeatherAirQuality(city) {
     }
 }
 
-// Modify the existing fetchAirQualityData function
+// Helper function to remove outliers using IQR method
+function removeOutliers(readings) {
+    if (readings.length < 4) return readings;
+
+    // Sort the readings
+    readings.sort((a, b) => a - b);
+
+    // Calculate Q1 and Q3
+    const q1 = readings[Math.floor(readings.length / 4)];
+    const q3 = readings[Math.floor(readings.length * 3 / 4)];
+
+    // Calculate IQR and bounds
+    const iqr = q3 - q1;
+    const lowerBound = q1 - 1.5 * iqr;
+    const upperBound = q3 + 1.5 * iqr;
+
+    // Filter out outliers
+    return readings.filter(x => x >= lowerBound && x <= upperBound);
+}
+
 async function fetchAirQualityData(city) {
     try {
-        // Try WAQI first
-        const response = await fetch(
-            `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
-        );
-        
-        const data = await response.json();
-        
-        let pm25 = data.data?.iaqi?.pm25?.v || null;
-        let pm10 = data.data?.iaqi?.pm10?.v || null;
-        let no2 = data.data?.iaqi?.no2?.v || null;
-        let so2 = data.data?.iaqi?.so2?.v || null;
-        let co = data.data?.iaqi?.co?.v || null;
+        // Get multiple readings over a short period
+        const readings = [];
+        const numReadings = 3; // Number of readings to average
+        const delayBetweenReadings = 2000; // 2 seconds between readings
 
-        // If either PM2.5 or PM10 is null, try OpenWeather
-        if (pm25 === null || pm10 === null) {
-            console.log(`PM2.5 or PM10 data missing for ${city}, trying OpenWeather...`);
-            const owData = await fetchOpenWeatherAirQuality(city);
-            if (owData) {
-                // Only replace null values
-                pm25 = pm25 === null ? owData.pm25 : pm25;
-                pm10 = pm10 === null ? owData.pm10 : pm10;
-                no2 = no2 === null ? owData.no2 : no2;
-                so2 = so2 === null ? owData.so2 : so2;
-                co = co === null ? owData.co : co;
+        for (let i = 0; i < numReadings; i++) {
+            const response = await fetch(
+                `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
+            );
+            const data = await response.json();
+            
+            // Store both raw and processed readings
+            if (data.data?.iaqi?.pm25?.v) {
+                readings.push({
+                    pm25: parseFloat(data.data.iaqi.pm25.v),
+                    pm10: data.data?.iaqi?.pm10?.v ? parseFloat(data.data.iaqi.pm10.v) : null,
+                    no2: data.data?.iaqi?.no2?.v ? parseFloat(data.data.iaqi.no2.v) : null,
+                    so2: data.data?.iaqi?.so2?.v ? parseFloat(data.data.iaqi.so2.v) : null,
+                    co: data.data?.iaqi?.co?.v ? parseFloat(data.data.iaqi.co.v) : null,
+                });
+            }
+            
+            // Wait before next reading
+            if (i < numReadings - 1) {
+                await new Promise(resolve => setTimeout(resolve, delayBetweenReadings));
             }
         }
 
+        if (readings.length === 0) {
+            console.log(`No valid readings obtained for ${city}`);
+            return null;
+        }
+
+        // Process each metric separately
+        const processMetric = (metricName) => {
+            const metricReadings = readings
+                .map(r => r[metricName])
+                .filter(v => v !== null);
+            
+            if (metricReadings.length === 0) return null;
+
+            const validReadings = removeOutliers(metricReadings);
+            return validReadings.length > 0 
+                ? validReadings.reduce((a, b) => a + b, 0) / validReadings.length 
+                : null;
+        };
+
+        // Calculate smoothed values for each metric
+        const smoothedData = {
+            pm25: processMetric('pm25'),
+            pm10: processMetric('pm10'),
+            no2: processMetric('no2'),
+            so2: processMetric('so2'),
+            co: processMetric('co'),
+        };
+
         return {
             city: city,
-            station_id: data.data?.idx || null,
-            created_at: data.data?.time?.s || new Date().toISOString(),
-            pm25: pm25 ? parseFloat(pm25) : null,
-            pm10: pm10 ? parseFloat(pm10) : null,
+            created_at: new Date().toISOString(),
+            ...smoothedData,
+            raw_pm25: readings[0]?.pm25 || null, // Store the first raw reading
             air_quality: data.data?.aqi?.toString() || null,
-            temp: data.data?.iaqi?.t?.v?.toString() || null,
-            co: co ? parseFloat(co) : null,
-            no2: no2 ? parseFloat(no2) : null,
-            so2: so2 ? parseFloat(so2) : null
         };
     } catch (error) {
         console.error(`Error fetching data for ${city}:`, error);
-        
-        // Try OpenWeather as complete fallback
-        console.log(`Trying OpenWeather as complete fallback for ${city}...`);
-        const owData = await fetchOpenWeatherAirQuality(city);
-        if (owData) {
-            return {
-                city: city,
-                station_id: null,
-                created_at: new Date().toISOString(),
-                pm25: parseFloat(owData.pm25),
-                pm10: parseFloat(owData.pm10),
-                air_quality: null,
-                temp: null,
-                co: parseFloat(owData.co),
-                no2: parseFloat(owData.no2),
-                so2: parseFloat(owData.so2)
-            };
-        }
-        
-        throw new AppError(`Failed to fetch data for ${city} from both sources`, 500);
+        return null;
     }
 }
 
