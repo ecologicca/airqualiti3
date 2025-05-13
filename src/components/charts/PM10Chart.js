@@ -167,6 +167,7 @@ const PM10Chart = ({ data, userPreferences }) => {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    spanGaps: true,
     scales: {
       x: {
         type: 'time',

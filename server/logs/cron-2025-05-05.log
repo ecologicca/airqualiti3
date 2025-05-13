@@ -1,0 +1,14 @@
+2025-05-05T06:00:00.759Z: Cron job started (Schedule: 0 6 * * *)
+2025-05-05T06:00:00.787Z: === Starting weather data fetch (triggered by: cron) ===
+2025-05-05T06:00:03.112Z: Fetch successful!
+2025-05-05T06:00:03.114Z: Cities updated: 
+2025-05-05T06:00:03.115Z: Total records: 0
+2025-05-05T06:00:03.115Z: === Weather data fetch complete ===
+
+2025-05-05T18:00:00.128Z: Cron job started (Schedule: 0 18 * * *)
+2025-05-05T18:00:00.139Z: === Starting weather data fetch (triggered by: cron) ===
+2025-05-05T18:00:01.207Z: Fetch successful!
+2025-05-05T18:00:01.208Z: Cities updated: 
+2025-05-05T18:00:01.208Z: Total records: 0
+2025-05-05T18:00:01.208Z: === Weather data fetch complete ===
+

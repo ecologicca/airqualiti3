@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import PM25Chart from '../../components/charts/PM25Chart';
 import PM10Chart from '../../components/charts/PM10Chart';
-import COChart from '../../components/charts/COChart';
 import CityComparisonChart from '../../components/charts/CityComparisonChart';
 import HealthImpactAnalysis from '../../components/HealthImpactAnalysis';
 import '../../styles/style.css';
@@ -71,9 +70,9 @@ const Dashboard = () => {
 
         const transformedData = airData.map(item => ({
           ...item,
-          'PM 2.5': item.pm25 || item['PM 2.5'],
-          'PM 10': item.pm10 || item['PM 10'],
-          'CO': item.co,
+          'PM 2.5': parseFloat(item.pm25 || item['PM 2.5'] || 0),
+          'PM 10': parseFloat(item.pm10 || item['PM 10'] || 0),
+          'CO': parseFloat(item.co || 0),
           date: new Date(item.created_at || item.date)
         }));
         
@@ -173,14 +172,20 @@ const Dashboard = () => {
       trend: 0
     };
 
-    const pm25Values = data.map(d => parseFloat(d['PM 2.5']));
-    const pm10Values = data.map(d => parseFloat(d['PM 10']));
+    // Filter out invalid values before calculating averages
+    const pm25Values = data
+      .map(d => parseFloat(d['PM 2.5']))
+      .filter(val => !isNaN(val));
+      
+    const pm10Values = data
+      .map(d => parseFloat(d['PM 10']))
+      .filter(val => !isNaN(val));
 
     return {
-      avgPM25: (pm25Values.reduce((a, b) => a + b, 0) / pm25Values.length).toFixed(1),
-      avgPM10: (pm10Values.reduce((a, b) => a + b, 0) / pm10Values.length).toFixed(1),
-      qualityScore: Math.round((1 - pm25Values[0] / 50) * 100),
-      trend: ((pm25Values[0] - pm25Values[pm25Values.length - 1]) / pm25Values[pm25Values.length - 1] * 100).toFixed(1)
+      avgPM25: pm25Values.length ? (pm25Values.reduce((a, b) => a + b, 0) / pm25Values.length).toFixed(1) : 0,
+      avgPM10: pm10Values.length ? (pm10Values.reduce((a, b) => a + b, 0) / pm10Values.length).toFixed(1) : 0,
+      qualityScore: pm25Values.length ? Math.round((1 - pm25Values[0] / 50) * 100) : 0,
+      trend: pm25Values.length > 1 ? ((pm25Values[0] - pm25Values[pm25Values.length - 1]) / pm25Values[pm25Values.length - 1] * 100).toFixed(1) : 0
     };
   };
 
@@ -259,16 +264,6 @@ const Dashboard = () => {
             </div>
             <PM10Chart data={data} userPreferences={userPreferences} />
         </div>
-      </div>
-
-        {/* O3 and CO Charts Row */}
-        <div className="charts-row">
-          <div className="card large chart-card">
-            <div className="card-header">
-              <h2 className="card-title">Carbon Monoxide (CO) Levels</h2>
-            </div>
-            <COChart data={data} userPreferences={userPreferences} />
-          </div>
       </div>
 
         {/* City Comparison */}

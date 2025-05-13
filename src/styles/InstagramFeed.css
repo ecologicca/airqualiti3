@@ -1,0 +1,51 @@
+.instagram-feed-container {
+  background: white;
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  margin: 2rem 0;
+}
+
+.feed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.feed-header h2 {
+  color: #333;
+  margin: 0;
+}
+
+.follow-button {
+  background-color: #1a472a;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.follow-button:hover {
+  background-color: #043A24;
+}
+
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .instagram-feed-container {
+    padding: 1rem;
+  }
+  
+  .feed-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+} 

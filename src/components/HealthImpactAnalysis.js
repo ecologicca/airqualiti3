@@ -195,31 +195,36 @@ const HealthImpactAnalysis = ({ data, userPreferences }) => {
   
   // Get values from user preferences with defaults
   const activityLevel = Number(userPreferences?.activity_level) || 5;
-  // Get numeric sleep level from preferences
   const sleepLevel = Number(userPreferences?.sleep_level) || SLEEP_QUALITY_MAP.moderate;
-  // Convert numeric sleep level to score for calculations
   const sleepScore = SLEEP_SCORE_MAP[sleepLevel] || 65;
   const userAnxietyLevel = Number(userPreferences?.anxiety_base_level) || 5;
 
-  // Log the actual values being used
-  console.log('Normalized Calculation Inputs:', {
+  console.log('Raw Values:', {
     pm25,
     pm10,
     activityLevel,
     sleepLevel,
     sleepScore,
     userAnxietyLevel,
-    hasHVAC: userPreferences?.has_HVAC,
-    hasEcologgica: userPreferences?.has_ecologgica
+    userPreferences
   });
 
-  // Adjust PM2.5 based on air purification systems
+  // Adjust PM values based on air purification systems
   let adjustedPM25 = pm25;
-  if (userPreferences?.has_HVAC) adjustedPM25 *= 0.7; // 30% reduction
-  if (userPreferences?.has_ecologgica) adjustedPM25 *= 0.6; // Additional 40% reduction
+  let adjustedPM10 = pm10;
+  
+  if (userPreferences?.has_HVAC) {
+    adjustedPM25 *= 0.7; // 30% reduction
+    adjustedPM10 *= 0.7;
+  }
+  if (userPreferences?.has_ecologgica) {
+    adjustedPM25 *= 0.6; // Additional 40% reduction
+    adjustedPM10 *= 0.6;
+  }
 
-  const respiratoryMetrics = calculateRespiratoryScore(activityLevel, adjustedPM25, pm10, sleepScore);
-  const cardiovascularMetrics = calculateCardiovascularScore(activityLevel, adjustedPM25, pm10, sleepScore);
+  // Calculate metrics with adjusted values
+  const respiratoryMetrics = calculateRespiratoryScore(activityLevel, adjustedPM25, adjustedPM10, sleepScore);
+  const cardiovascularMetrics = calculateCardiovascularScore(activityLevel, adjustedPM25, adjustedPM10, sleepScore);
   const sleepMetrics = calculateSleepScore(sleepLevel, adjustedPM25, userAnxietyLevel);
 
   // Log the final results
