@@ -84,31 +84,51 @@ const Insights = () => {
 
   const fetchUserProfile = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log('No user found');
+        setError('Please sign in to view insights');
         return;
       }
+
+      // Set email from auth
+      setUserProfile(prev => ({
+        ...prev,
+        email: user.email
+      }));
 
       const { data, error } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user preferences:', error.message);
+        setError('Failed to load profile data. Please try again.');
+        return;
+      }
 
-      const age = calculateAge(data.birthdate);
-      console.log('User birthdate:', data.birthdate);
-      console.log('Calculated age:', age);
-
-      setUserProfile({
-        ...data,
-        age: age
-      });
+      // Only update form data if we found preferences
+      if (data) {
+        setUserProfile({
+          ...data,
+          age: calculateAge(data.birthdate)
+        });
+      } else {
+        // Set default profile
+        setUserProfile({
+          city: 'Toronto',
+          anxiety_base_level: 5,
+          activity_level: 5,
+          sleep_level: 3
+        });
+      }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to load user profile');
+      console.error('Error in fetchUserProfile:', error.message);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -216,6 +216,13 @@ const AnxietyRiskChart = ({ userPreferences, airQualitySettings }) => {
 
   const fetchAnxietyData = async () => {
     try {
+      if (!userPreferences?.city) {
+        console.log('No city selected in preferences');
+        setError('Please select a city in your profile settings');
+        setLoading(false);
+        return;
+      }
+
       const endDate = new Date().toISOString();
       const periodDays = ALGORITHMS[selectedPeriod].period_days;
       console.log(`Fetching ${periodDays} days of data for ${selectedPeriod} period`);
@@ -223,16 +230,21 @@ const AnxietyRiskChart = ({ userPreferences, airQualitySettings }) => {
       const { data: airData, error: airError } = await supabase
         .from('weather_data')
         .select('*')
-        .eq('city', userPreferences?.city)
+        .eq('city', userPreferences.city)
         .lte('created_at', endDate)
         .order('created_at', { ascending: false })
         .limit(periodDays);
 
-      if (airError) throw airError;
+      if (airError) {
+        console.error('Error fetching air data:', airError.message);
+        setError('Failed to load air quality data');
+        setLoading(false);
+        return;
+      }
 
       if (!airData || airData.length === 0) {
-        console.log('No data returned from Supabase');
-        setError('No data available');
+        console.log('No data available for city:', userPreferences.city);
+        setError('No air quality data available for your city');
         setLoading(false);
         return;
       }
@@ -240,28 +252,28 @@ const AnxietyRiskChart = ({ userPreferences, airQualitySettings }) => {
       // Sort data in ascending order for chart display
       const sortedData = airData.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-      console.log('Fetched air data:', sortedData);
-      console.log('Sample PM2.5 values:', sortedData.map(d => d.pm25).slice(0, 5));
-
       // Calculate base risk data
       const baseData = sortedData.map(item => {
-        const pm25 = parseFloat(item.pm25 || 0);
-        console.log(`Processing PM2.5 value: ${pm25} from:`, item);
+        const pm25 = parseFloat(item.pm25 || item['PM 2.5'] || 0);
         return {
           date: new Date(item.created_at),
           risk: calculateBaseAnxietyRisk(pm25),
           pm25: pm25
         };
-      });
-      
-      console.log('Calculated base risks:', baseData.map(d => d.risk).slice(0, 5));
+      }).filter(item => !isNaN(item.risk) && !isNaN(item.pm25));
+
+      if (baseData.length === 0) {
+        setError('Unable to calculate anxiety risk from available data');
+        setLoading(false);
+        return;
+      }
       
       setBaseRiskData(baseData);
       updateChartWithSettings(baseData);
-      setLoading(false);
     } catch (err) {
-      console.error('Error fetching anxiety data:', err);
+      console.error('Error in fetchAnxietyData:', err.message);
       setError('Failed to load anxiety risk data');
+    } finally {
       setLoading(false);
     }
   };

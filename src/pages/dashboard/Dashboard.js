@@ -108,18 +108,36 @@ const Dashboard = () => {
   const fetchUserPreferences = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No authenticated user found');
+        return;
+      }
 
       const { data: preferences, error } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
-      setUserPreferences(preferences);
+      if (error) {
+        console.error('Error fetching user preferences:', error.message);
+        return;
+      }
+
+      if (preferences) {
+        setUserPreferences(preferences);
+      } else {
+        console.log('No preferences found for user');
+        // Set default preferences
+        setUserPreferences({
+          city: 'Toronto', // Default city
+          anxiety_base_level: 5,
+          activity_level: 5,
+          sleep_level: 3
+        });
+      }
     } catch (error) {
-      console.error('Error fetching user preferences:', error);
+      console.error('Error in fetchUserPreferences:', error.message);
     }
   };
 
