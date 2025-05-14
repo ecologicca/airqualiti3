@@ -1,11 +1,12 @@
 import React from 'react';
-import TopNavbar from './Navbar';
+import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import '../../styles/layout.css';
 
-const Layout = ({ children, city, onCityChange }) => {
+const Layout = ({ children }) => {
     return (
-        <div className="app-container">
-            <TopNavbar city={city} onCityChange={onCityChange} />
+        <div className="app">
+            <Navbar />
             <div className="main-layout">
                 <Sidebar />
                 <main className="main-content">

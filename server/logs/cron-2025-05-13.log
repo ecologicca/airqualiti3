@@ -4,3 +4,10 @@
 2025-05-13T16:18:53.865Z: Total records: 0
 2025-05-13T16:18:53.866Z: === Weather data fetch complete ===
 
+2025-05-13T18:00:00.469Z: Cron job started (Schedule: 0 18 * * *)
+2025-05-13T18:00:00.490Z: === Starting weather data fetch (triggered by: cron) ===
+2025-05-13T18:00:02.329Z: Fetch successful!
+2025-05-13T18:00:02.330Z: Cities updated: 
+2025-05-13T18:00:02.332Z: Total records: 0
+2025-05-13T18:00:02.332Z: === Weather data fetch complete ===
+

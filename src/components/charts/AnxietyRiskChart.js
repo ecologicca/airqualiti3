@@ -15,7 +15,9 @@ import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
 import { supabase } from '../../supabaseClient';
 import ChartLegend from './ChartLegend';
-import { calculateIndoorWithDevices } from '../../utils/airQualityCalculations';
+import { calculateIndoorWithDevices, applyRiskReduction } from '../../utils/airQualityCalculations';
+import { format } from 'date-fns';
+import { chartColors, baseChartOptions } from './ChartStyles';
 
 // Register Chart.js components
 ChartJS.register(
@@ -107,7 +109,7 @@ const aggregateDataByDay = (data) => {
   }));
 };
 
-const AnxietyRiskChart = ({ userPreferences }) => {
+const AnxietyRiskChart = ({ userPreferences, airQualitySettings }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('MONTHLY_GENERAL');
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -115,6 +117,11 @@ const AnxietyRiskChart = ({ userPreferences }) => {
   const [algorithms, setAlgorithms] = useState({});
   const [algorithmDescriptions, setAlgorithmDescriptions] = useState({});
   const [showTooltip, setShowTooltip] = useState(false);
+  const [baseRiskData, setBaseRiskData] = useState([]);
+
+  // Constants for anxiety risk calculation
+  const WHO_THRESHOLD = 12; // WHO guideline for PM2.5
+  const ROLLING_DAYS = 90; // Changed to 90-day rolling average
 
   // Fetch algorithm descriptions from Supabase
   useEffect(() => {
@@ -166,97 +173,125 @@ const AnxietyRiskChart = ({ userPreferences }) => {
     return windowData.reduce((sum, day) => sum + parseFloat(day.pm25 || 0), 0) / windowData.length;
   };
 
-  // Modify the data processing in useEffect
+  const calculateBaseAnxietyRisk = (pm25Value) => {
+    // More sensitive base risk calculation
+    if (pm25Value === null || pm25Value === undefined) {
+      console.log('Warning: Invalid PM2.5 value:', pm25Value);
+      return 0.5; // Base risk level instead of 0
+    }
+
+    // Start with a base risk level
+    let risk = 0.5; // Baseline risk
+
+    // Add risk based on PM2.5 levels
+    if (pm25Value <= WHO_THRESHOLD) {
+      // Below threshold: slight variations around baseline
+      risk += (pm25Value / WHO_THRESHOLD) * 0.2; // Max +0.2 at threshold
+    } else {
+      // Above threshold: more significant increase
+      risk = 0.7 + ((pm25Value - WHO_THRESHOLD) / 20) * 2.3; // Scale to reach max 3.0
+    }
+    
+    const clampedRisk = Math.min(Math.max(risk, 0.3), 3);
+    console.log(`PM2.5: ${pm25Value} -> Base Anxiety Risk: ${clampedRisk}`);
+    return clampedRisk;
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (!algorithms || !selectedPeriod || !userPreferences?.city) {
-          console.log('Missing required data:', {
-            hasAlgorithms: !!algorithms,
-            selectedPeriod,
-            city: userPreferences?.city
-          });
-          return;
-        }
+    if (userPreferences?.city) {
+      console.log('Fetching data for city:', userPreferences.city);
+      fetchAnxietyData();
+    } else {
+      console.log('No city selected in user preferences');
+    }
+  }, [userPreferences, selectedPeriod]);
 
-        const currentAlgo = algorithms[selectedPeriod];
-        if (!currentAlgo) {
-          console.log('Available algorithms:', Object.keys(algorithms));
-          console.log('Selected period:', selectedPeriod);
-          console.log('No matching algorithm found');
-          return;
-        }
+  useEffect(() => {
+    if (baseRiskData.length > 0) {
+      console.log('Updating chart with settings:', airQualitySettings);
+      console.log('Base risk data points:', baseRiskData.length);
+      updateChartWithSettings();
+    }
+  }, [airQualitySettings, baseRiskData]);
 
-        console.log('Using algorithm:', currentAlgo);
+  const fetchAnxietyData = async () => {
+    try {
+      const endDate = new Date().toISOString();
+      const periodDays = ALGORITHMS[selectedPeriod].period_days;
+      console.log(`Fetching ${periodDays} days of data for ${selectedPeriod} period`);
 
-        // Fetch PM2.5 data
-        const { data: pmData, error: pmError } = await supabase
-          .from('weather_data')
-          .select('*')
-          .eq('city', userPreferences.city)
-          .order('created_at', { ascending: false })
-          .limit(currentAlgo.period_days * 4);
+      const { data: airData, error: airError } = await supabase
+        .from('weather_data')
+        .select('*')
+        .eq('city', userPreferences?.city)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false })
+        .limit(periodDays);
 
-        if (pmError) throw pmError;
+      if (airError) throw airError;
 
-        if (!pmData || pmData.length === 0) {
-          setError('No weather data available for your city');
-          return;
-        }
-
-        const periodDays = currentAlgo.period_days;
-
-        // Calculate risk scores with rolling averages
-        const data = pmData.map((_, index) => {
-          const rollingAvg = calculateRollingAverage(pmData, index, periodDays);
-          const baseLevel = userPreferences.anxiety_base_level || 5;
-          const hasHVAC = userPreferences.has_HVAC;
-          const hasAirPurifier = userPreferences.has_ecologgica;
-          
-          const riskScore = calculateAnxietyRisk(
-            baseLevel,
-            rollingAvg,
-            hasHVAC,
-            hasAirPurifier
-          );
-
-          return {
-            x: new Date(pmData[index].created_at),
-            y: riskScore,
-            raw: {
-              pm25: pmData[index].pm25,
-              rolling_average: rollingAvg,
-              base_level: baseLevel,
-              adjustments: {
-                hvac: hasHVAC ? '30% reduction' : 'none',
-                purifier: hasAirPurifier ? '40% reduction' : 'none'
-              }
-            }
-          };
-        });
-
-        setChartData({
-          datasets: [{
-            label: currentAlgo.description,
-            data: data,
-            borderColor: currentAlgo.color,
-            backgroundColor: `${currentAlgo.color}20`,
-            fill: true
-          }]
-        });
-
-      } catch (err) {
-        console.error('Error fetching anxiety risk data:', err);
-        setError('Failed to load anxiety risk data');
-      } finally {
+      if (!airData || airData.length === 0) {
+        console.log('No data returned from Supabase');
+        setError('No data available');
         setLoading(false);
+        return;
       }
+
+      // Sort data in ascending order for chart display
+      const sortedData = airData.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      console.log('Fetched air data:', sortedData);
+      console.log('Sample PM2.5 values:', sortedData.map(d => d.pm25).slice(0, 5));
+
+      // Calculate base risk data
+      const baseData = sortedData.map(item => {
+        const pm25 = parseFloat(item.pm25 || 0);
+        console.log(`Processing PM2.5 value: ${pm25} from:`, item);
+        return {
+          date: new Date(item.created_at),
+          risk: calculateBaseAnxietyRisk(pm25),
+          pm25: pm25
+        };
+      });
+      
+      console.log('Calculated base risks:', baseData.map(d => d.risk).slice(0, 5));
+      
+      setBaseRiskData(baseData);
+      updateChartWithSettings(baseData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching anxiety data:', err);
+      setError('Failed to load anxiety risk data');
+      setLoading(false);
+    }
+  };
+
+  const updateChartWithSettings = (data = baseRiskData) => {
+    const currentAlgorithm = ALGORITHMS[selectedPeriod];
+    
+    const formattedData = {
+      labels: data.map(item => item.date),
+      datasets: [
+        {
+          label: `${selectedPeriod.split('_')[0]} Anxiety Risk`,
+          data: data.map(item => {
+            const adjustedRisk = applyRiskReduction(item.risk, airQualitySettings);
+            console.log(`Original risk: ${item.risk} -> Adjusted risk: ${adjustedRisk}`);
+            return {
+              x: item.date,
+              y: adjustedRisk
+            };
+          }),
+          borderColor: currentAlgorithm.color,
+          backgroundColor: `${currentAlgorithm.color}33`, // Add 20% opacity
+          fill: true,
+          tension: 0.4
+        }
+      ]
     };
 
-    if (userPreferences?.city) {
-      fetchData();
-    }
-  }, [userPreferences, selectedPeriod, algorithms]);
+    setChartData(formattedData);
+  };
 
   const calculateAge = (birthdate) => {
     if (!birthdate) return 0;
@@ -284,53 +319,62 @@ const AnxietyRiskChart = ({ userPreferences }) => {
       x: {
         type: 'time',
         time: {
-          unit: selectedPeriod === 'WEEKLY' ? 'week' : 
-                selectedPeriod === 'MONTHLY_GENERAL' ? 'month' : 'quarter',
+          unit: 'day',
           displayFormats: {
-            week: 'MMM d',
-            month: 'MMM yyyy',
-            quarter: 'QQQ yyyy'
+            day: 'MMM d'
           }
         },
-        title: {
+        grid: {
           display: true,
-          text: 'Date'
-        }
-      },
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Anxiety Risk Level'
-        }
-      }
-    },
-    plugins: {
-      legend: {
-        display: true,
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          padding: 20,
+          drawBorder: false,
+          color: 'rgba(0, 0, 0, 0.1)'
+        },
+        ticks: {
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 8,
           font: {
             size: 12
           }
         }
       },
-      tooltip: {
-        callbacks: {
-          label: (context) => {
-            const data = context.raw;
-            return [
-              `Risk Score: ${data.y.toFixed(2)}`,
-              `Daily PM2.5: ${data.raw.pm25.toFixed(1)} μg/m³`,
-              `${selectedPeriod.split('_')[0]} Average: ${data.raw.rolling_average.toFixed(1)} μg/m³`,
-              `Base Anxiety Level: ${data.raw.base_level}`,
-              `HVAC: ${data.raw.adjustments.hvac}`,
-              `Air Purifier: ${data.raw.adjustments.purifier}`
-            ];
+      y: {
+        beginAtZero: true,
+        max: 3,
+        grid: {
+          display: true,
+          drawBorder: false,
+          color: 'rgba(0, 0, 0, 0.1)'
+        },
+        ticks: {
+          stepSize: 0.5,
+          font: {
+            size: 12
+          }
+        },
+        title: {
+          display: true,
+          text: 'Risk Level',
+          font: {
+            size: 14,
+            weight: 'normal'
           }
         }
+      }
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          title: (context) => {
+            return format(new Date(context[0].raw.x), 'MMM d, yyyy');
+          },
+          label: (context) => {
+            return `Risk Level: ${context.raw.y.toFixed(2)}`;
+          }
+        }
+      },
+      legend: {
+        display: false
       }
     }
   };
@@ -379,47 +423,20 @@ const AnxietyRiskChart = ({ userPreferences }) => {
               width: '300px',
               zIndex: 10
             }}>
-              <h4>Anxiety Risk Score Calculation</h4>
+              <h4>Anxiety Risk Score</h4>
               <p>This score is calculated using:</p>
               <ul>
-                <li>Age-specific algorithms:
-                  <ul>
-                    <li>Weekly (anxSym96): Optimized for seniors 65+</li>
-                    <li>Monthly (anxSym961): Suitable for all ages</li>
-                    <li>Quarterly (anxDis32): Suitable for all ages</li>
-                  </ul>
-                </li>
-                <li>Your profile:
-                  <ul>
-                    <li>Age: {calculateAge(userPreferences.birthdate)} years</li>
-                    <li>Base anxiety level: {userPreferences.anxiety_base_level || 5}</li>
-                  </ul>
-                </li>
-                <li>Rolling average of PM2.5 levels:
-                  <ul>
-                    <li>Weekly: 7-day average</li>
-                    <li>Monthly: 30-day average</li>
-                    <li>Quarterly: 90-day average</li>
-                  </ul>
-                </li>
-                <li>Indoor air quality improvements:
-                  <ul>
-                    <li>HVAC system: 30% reduction</li>
-                    <li>Air purifier: Additional 40% reduction</li>
-                  </ul>
-                </li>
-                <li>Risk adjustments:
-                  <ul>
-                    <li>Increases up to 12% per 10 μg/m³ above threshold</li>
-                    <li>Decreases up to 10% when below threshold</li>
-                  </ul>
-                </li>
+                <li>{ALGORITHMS[selectedPeriod].period_days}-day analysis period</li>
+                <li>WHO guideline threshold ({WHO_THRESHOLD} μg/m³)</li>
+                <li>Non-linear risk increase above threshold</li>
+                <li>Indoor air quality improvements:</li>
+                <ul>
+                  <li>Windows Open: 10% reduction</li>
+                  <li>Non-Toxic Products: 8% reduction</li>
+                  <li>Recent Filter Change: 15% reduction</li>
+                </ul>
               </ul>
-              <p style={{ fontSize: '0.9em', marginTop: '0.5rem', color: '#666' }}>
-                Note: Some algorithms are age-specific. For example, the weekly analysis (anxSym96) 
-                is only shown for users 65 and older, as research shows stronger correlations 
-                between air quality and anxiety symptoms in this age group.
-              </p>
+              <p>Higher scores indicate increased risk to anxiety based on PM2.5 exposure.</p>
             </div>
           )}
         </div>
@@ -442,7 +459,10 @@ const AnxietyRiskChart = ({ userPreferences }) => {
           {Object.entries(algorithms).map(([key, algo]) => (
             <button
               key={key}
-              onClick={() => setSelectedPeriod(key)}
+              onClick={() => {
+                console.log('Switching to period:', key);
+                setSelectedPeriod(key);
+              }}
               style={{
                 padding: '8px 16px',
                 border: '2px solid var(--button-color)',

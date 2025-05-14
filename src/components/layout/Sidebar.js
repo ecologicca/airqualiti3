@@ -16,8 +16,8 @@ const Sidebar = () => {
                     Dashboard
                 </Link>
                 <Link 
-                    to="/preferences" 
-                    className={`nav-link ${location.pathname === '/preferences' ? 'active' : ''}`}
+                    to="/profile" 
+                    className={`nav-link ${location.pathname === '/profile' ? 'active' : ''}`}
                 >
                     <FaUser />
                     Profile

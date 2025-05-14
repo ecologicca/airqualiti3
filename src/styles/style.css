@@ -2013,4 +2013,51 @@ body {
     margin-bottom: 1rem;
   }
   
+  .category-button {
+    border: none;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+  
+  .category-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .category-button.selected {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  
+  .icon-circle {
+    transition: all 0.2s ease;
+  }
+  
+  .category-button:hover .icon-circle {
+    transform: scale(1.1);
+  }
+  
+  .category-button.selected .icon-circle {
+    transform: scale(1);
+  }
+  
+  .chart-header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .chart-title {
+    margin: 0;
+    color: #043A24;
+    font-size: 24px;
+  }
+  
+  .time-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+  }
+  
   

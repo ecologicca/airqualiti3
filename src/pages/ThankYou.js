@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from './supabaseClient';
+import { supabase } from '../supabaseClient';
 
 const ThankYou = () => {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const ThankYou = () => {
   return (
     <div className="thank-you-container">
       <h1>Thank You for Signing Up!</h1>
-      <p>We’ve sent a confirmation link to your email. Please verify your account.</p>
+      <p>We've sent a confirmation link to your email. Please verify your account.</p>
       <button onClick={handleGoToQuestionnaire}>Go to Questionnaire</button>
 
       {showModal && (

@@ -1,7 +1,7 @@
 // MainRouter.js
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from '../server/services/supabaseClient';
+import { supabase } from './supabaseClient';
 import Navbar from './Navbar';
 import Sidebar from './components/layout/Sidebar';
 import Login from './pages/login';
@@ -10,7 +10,7 @@ import Dashboard from './pages/dashboard/Dashboard';
 import ThankYou from './ThankYou';
 import WelcomePage from './pages/WelcomePage';
 import Questionnaire from './Questionnaire';
-import UserPreferences from './pages/UserPreferences';
+import Profile from './pages/profile';
 import ResetPassword from './pages/ResetPassword';
 
 const MainRouter = () => {
@@ -65,7 +65,7 @@ const MainRouter = () => {
               <Route path="/signup" element={<SignUp />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/userpreferences" element={<UserPreferences />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
             </Routes>
           </div>

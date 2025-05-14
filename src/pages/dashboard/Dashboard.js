@@ -4,27 +4,62 @@ import PM25Chart from '../../components/charts/PM25Chart';
 import PM10Chart from '../../components/charts/PM10Chart';
 import CityComparisonChart from '../../components/charts/CityComparisonChart';
 import HealthImpactAnalysis from '../../components/HealthImpactAnalysis';
+import { FaHeart, FaLungs, FaBrain, FaChild, FaUser } from 'react-icons/fa';
 import '../../styles/style.css';
+import CategoryButtons from '../../components/CategoryButtons';
+import AirQualityDisplay from '../../components/AirQualityDisplay';
+import RespiratoryHealthScore from '../../components/RespiratoryHealthScore';
+import AirPollutantExposure from '../../components/AirPollutantExposure';
+import CognitiveFunctionImpact from '../../components/CognitiveFunctionImpact';
+import AirQualityBrainHealth from '../../components/AirQualityBrainHealth';
+import OverallHealthImpact from '../../components/OverallHealthImpact';
+import AirQualityRecommendations from '../../components/AirQualityRecommendations';
+import YearlyPM25Comparison from '../../components/YearlyPM25Comparison';
+import { useNavigate } from 'react-router-dom';
 
-// Utility function for deeper sleep calculation
-const calculateDeeperSleepMinutes = (data, hasEcologica) => {
-  const getAdjustedValue = (value) => {
-    // Always apply indoor reduction first
-    const indoorValue = value * 0.7;
-    // Then apply Ecologica if present
-    if (hasEcologica) return value * 0.5;
-    return indoorValue;
-  };
-
-  const daysUnderThreshold = data.filter(day => {
-    const adjustedValue = getAdjustedValue(parseFloat(day['PM 2.5']));
-    return adjustedValue <= 5;
-  }).length;
-
-  return daysUnderThreshold * 8 * 60;
-};
-
+// Constants
+const WHO_GUIDELINE = 10; // WHO guideline for PM2.5
 const REFRESH_COOLDOWN = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+const CategoryButton = ({ icon, label, isSelected, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`category-button ${isSelected ? 'selected' : ''}`}
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '16px',
+      background: isSelected ? '#e6f4ea' : 'white',
+      border: isSelected ? '2px solid #043A24' : '1px solid #e0e0e0',
+      borderRadius: '12px',
+      cursor: 'pointer',
+      minWidth: '120px',
+      transition: 'all 0.2s ease'
+    }}
+  >
+    <div className="icon-circle" style={{
+      background: '#e6f4ea',
+      borderRadius: '50%',
+      width: '40px',
+      height: '40px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#043A24'
+    }}>
+      {icon}
+    </div>
+    <span style={{
+      color: '#043A24',
+      fontSize: '0.9rem',
+      fontWeight: '500'
+    }}>
+      {label}
+    </span>
+  </button>
+);
 
 const Dashboard = () => {
   const [data, setData] = useState([]);
@@ -33,6 +68,101 @@ const Dashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [nextRefreshTime, setNextRefreshTime] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('heart');
+  const navigate = useNavigate();
+
+  // Add function to format date
+  const formatDate = () => {
+    const date = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  useEffect(() => {
+    fetchUserPreferences();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('custom-all-channel')
+      .on('broadcast', { event: 'city_update' }, async (payload) => {
+        console.log('Received city update:', payload);
+        // Refresh user preferences and data
+        await fetchUserPreferences();
+        await fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (userPreferences?.city) {
+      fetchData();
+      const interval = setInterval(fetchData, 60 * 60 * 1000); // Refresh every hour
+      return () => clearInterval(interval);
+    }
+  }, [userPreferences?.city]); // Depend on city changes
+
+  const fetchUserPreferences = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: preferences, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      setUserPreferences(preferences);
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      setIsRefreshing(true);
+      if (!userPreferences?.city) {
+        console.log('No city selected');
+        return;
+      }
+
+      const { data: airData, error: airError } = await supabase
+        .from('weather_data')
+        .select('*')
+        .eq('city', userPreferences.city)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (airError) throw airError;
+
+      const transformedData = airData.map(item => {
+        const pm25 = parseFloat(item.pm25 || item['PM 2.5'] || 0);
+        const pm10 = parseFloat(item.pm10 || item['PM 10'] || 0);
+        const date = new Date(item.created_at || item.date);
+        
+        return {
+          ...item,
+          'PM 2.5': !isNaN(pm25) ? pm25 : 0,
+          'PM 10': !isNaN(pm10) ? pm10 : 0,
+          date: date.toISOString(),
+          created_at: date.toISOString()
+        };
+      }).filter(item => item['PM 2.5'] > 0 || item['PM 10'] > 0);
+      
+      setData(transformedData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsRefreshing(false);
+      setIsLoading(false);
+      setNextRefreshTime(Date.now() + REFRESH_COOLDOWN);
+    }
+  };
 
   // Add function to format time remaining
   const formatTimeRemaining = (ms) => {
@@ -43,48 +173,64 @@ const Dashboard = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const fetchData = async () => {
-      try {
-      setIsRefreshing(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-      const { data: preferences, error: prefError } = await supabase
-          .from('user_preferences')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-      if (prefError) throw prefError;
-      setUserPreferences(preferences);
-
-      if (preferences?.city) {
-        const { data: airData, error: airError } = await supabase
-          .from('weather_data')
-          .select('*')
-          .eq('city', preferences.city)
-          .order('created_at', { ascending: false })
-          .limit(30);
-
-        if (airError) throw airError;
-
-        const transformedData = airData.map(item => ({
-          ...item,
-          'PM 2.5': parseFloat(item.pm25 || item['PM 2.5'] || 0),
-          'PM 10': parseFloat(item.pm10 || item['PM 10'] || 0),
-          'CO': parseFloat(item.co || 0),
-          date: new Date(item.created_at || item.date)
-        }));
-        
-        setData(transformedData);
-      }
-      } catch (error) {
-      console.error('Error fetching data:', error);
-      } finally {
-      setIsRefreshing(false);
-        setIsLoading(false);
-      }
+  const calculateMetrics = () => {
+    if (!data.length) return {
+      avgPM25: 0,
+      avgPM10: 'NaN',
+      qualityScore: 0,
+      trend: 0
     };
+
+    // Filter out invalid values and sort by date
+    const pm25Values = data
+      .map(d => ({
+        value: parseFloat(d['PM 2.5'] || d.pm25),
+        date: new Date(d.created_at)
+      }))
+      .filter(item => !isNaN(item.value))
+      .sort((a, b) => b.date - a.date); // Most recent first
+
+    // Calculate 24-hour average (or available data points)
+    const last24Hours = pm25Values.filter(item => 
+      (Date.now() - item.date) <= 24 * 60 * 60 * 1000
+    );
+
+    const avgPM25 = last24Hours.length > 0
+      ? (last24Hours.reduce((sum, item) => sum + item.value, 0) / last24Hours.length).toFixed(1)
+      : pm25Values[0]?.value.toFixed(1) || 0;
+
+    // Calculate week-over-week trend
+    const currentWeekAvg = pm25Values
+      .filter(item => (Date.now() - item.date) <= 7 * 24 * 60 * 60 * 1000)
+      .reduce((acc, item, i, arr) => acc + (item.value / arr.length), 0);
+
+    const lastWeekAvg = pm25Values
+      .filter(item => 
+        (Date.now() - item.date) > 7 * 24 * 60 * 60 * 1000 && 
+        (Date.now() - item.date) <= 14 * 24 * 60 * 60 * 1000
+      )
+      .reduce((acc, item, i, arr) => acc + (item.value / (arr.length || 1)), 0) || currentWeekAvg;
+
+    // Calculate bounded quality score (0-100)
+    const qualityScore = Math.max(0, Math.min(100, Math.round((1 - avgPM25 / (WHO_GUIDELINE * 5)) * 100)));
+
+    // Calculate PM10 average
+    const pm10Values = data
+      .filter(d => d['PM 10'] || d.pm10)
+      .map(d => parseFloat(d['PM 10'] || d.pm10))
+      .filter(val => !isNaN(val));
+
+    const avgPM10 = pm10Values.length 
+      ? (pm10Values.reduce((a, b) => a + b, 0) / pm10Values.length).toFixed(1)
+      : 'NaN';
+
+    return {
+      avgPM25,
+      avgPM10,
+      qualityScore,
+      trend: lastWeekAvg ? ((currentWeekAvg - lastWeekAvg) / lastWeekAvg * 100).toFixed(1) : 0
+    };
+  };
 
   // Update triggerNewDataFetch with cooldown logic
   const triggerNewDataFetch = async () => {
@@ -150,12 +296,6 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [nextRefreshTime]);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 60 * 60 * 1000); // Refresh every hour
-    return () => clearInterval(interval);
-  }, []);
-
   if (isLoading) {
     return (
       <div className="loading-spinner">
@@ -164,115 +304,161 @@ const Dashboard = () => {
     );
   }
 
-  const calculateMetrics = () => {
-    if (!data.length) return {
-      avgPM25: 0,
-      avgPM10: 0,
-      qualityScore: 0,
-      trend: 0
-    };
-
-    // Filter out invalid values before calculating averages
-    const pm25Values = data
-      .map(d => parseFloat(d['PM 2.5']))
-      .filter(val => !isNaN(val));
-      
-    const pm10Values = data
-      .map(d => parseFloat(d['PM 10']))
-      .filter(val => !isNaN(val));
-
-    return {
-      avgPM25: pm25Values.length ? (pm25Values.reduce((a, b) => a + b, 0) / pm25Values.length).toFixed(1) : 0,
-      avgPM10: pm10Values.length ? (pm10Values.reduce((a, b) => a + b, 0) / pm10Values.length).toFixed(1) : 0,
-      qualityScore: pm25Values.length ? Math.round((1 - pm25Values[0] / 50) * 100) : 0,
-      trend: pm25Values.length > 1 ? ((pm25Values[0] - pm25Values[pm25Values.length - 1]) / pm25Values[pm25Values.length - 1] * 100).toFixed(1) : 0
-    };
-  };
-
   const metrics = calculateMetrics();
+
+  const renderContent = () => {
+    switch (selectedCategory) {
+      case 'lungs':
+        return (
+          <div className="dashboard-content" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '3rem',
+            padding: '2rem',
+            marginTop: '2rem'
+          }}>
+            <RespiratoryHealthScore 
+              score={86}
+              changePercentage={12}
+            />
+            <AirPollutantExposure />
+          </div>
+        );
+      case 'brain':
+        return (
+          <div className="dashboard-content" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '3rem',
+            padding: '2rem',
+            marginTop: '2rem'
+          }}>
+            <CognitiveFunctionImpact />
+            <AirQualityBrainHealth />
+          </div>
+        );
+      case 'body':
+        return (
+          <div className="dashboard-content" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '3rem',
+            padding: '2rem',
+            marginTop: '2rem'
+          }}>
+            <OverallHealthImpact />
+            <AirQualityRecommendations />
+          </div>
+        );
+      default:
+        return (
+          <div className="dashboard-content" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '3rem',
+            padding: '2rem',
+            marginTop: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px'
+            }}>
+              <AirQualityDisplay 
+                city={userPreferences?.city}
+                category={selectedCategory}
+                year={2025}
+              />
+            </div>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px'
+            }}>
+              <AirQualityDisplay 
+                city={userPreferences?.city}
+                category={selectedCategory}
+                year={2024}
+              />
+            </div>
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="dashboard">
-      <div className="dashboard-title">
-        <span>Air Quality Dashboard</span>
-        <div className="refresh-container">
-          {timeRemaining && (
-            <span className="refresh-timer">
-              Next refresh in: {formatTimeRemaining(timeRemaining)}
-            </span>
-          )}
-          <button 
-            className="refresh-button"
-            onClick={triggerNewDataFetch}
-            disabled={isRefreshing || timeRemaining !== null}
-          >
-            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-          </button>
+      <div className="dashboard-header" style={{
+        marginBottom: '2rem',
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '12px',
+        color: '#043A24'
+      }}>
+        <h1 style={{
+          fontSize: '1.75rem',
+          marginBottom: '0.5rem'
+        }}>
+          {userPreferences?.first_name ? `${userPreferences.first_name}'s ` : ''}
+          Personal Health Impact Report
+        </h1>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '1.1rem'
+        }}>
+          <div>{formatDate()}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📍 {userPreferences?.city || 'Loading location...'}
+          </div>
         </div>
       </div>
-      
-      <div className="dashboard-content">
-        {/* Metrics Row */}
-        <div className="metrics-row">
-          <div className="card small metric-card">
-            <h2 className="card-title">Average PM2.5</h2>
-            <div className="metric-value">{metrics.avgPM25}</div>
-            <div className={`metric-change ${parseFloat(metrics.trend) >= 0 ? 'positive' : 'negative'}`}>
-              {metrics.trend}% since last week
-            </div>
-          </div>
 
-          <div className="card small metric-card">
-            <h2 className="card-title">Average PM10</h2>
-            <div className="metric-value">{metrics.avgPM10}</div>
-            <div className="metric-change">μg/m³</div>
-          </div>
+      <CategoryButtons 
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+      />
 
-          <div className="card small metric-card">
-            <h2 className="card-title">Air Quality Score</h2>
-            <div className="metric-value">{metrics.qualityScore}</div>
-            <div className="metric-change">out of 100</div>
-          </div>
+      {renderContent()}
 
-          <div className="card small metric-card">
-            <h2 className="card-title">Active Sensors</h2>
-            <div className="metric-value">4</div>
-            <div className="metric-change positive">All operational</div>
-          </div>
+      {/* Summary charts with Health Impact first */}
+      <div className="dashboard-summary" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2rem',
+        marginTop: '3rem'
+      }}>
+        {/* Health Impact Analysis - full width */}
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '1.5rem'
+        }}>
+          <HealthImpactAnalysis userPreferences={userPreferences} />
         </div>
 
-        {/* Health Impact Analysis */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Health Impact Analysis</h2>
-          </div>
-          <HealthImpactAnalysis data={data} userPreferences={userPreferences} />
-        </div>
-
-        {/* Charts Row */}
-        <div className="charts-row">
-          <div className="card large chart-card">
-            <div className="card-header">
-              <h2 className="card-title">PM 2.5 Levels</h2>
-            </div>
+        {/* PM2.5 and PM10 charts in a row */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '2rem'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem'
+          }}>
+            {console.log('PM2.5 Chart Data:', data)}
             <PM25Chart data={data} userPreferences={userPreferences} />
           </div>
-
-          <div className="card large chart-card">
-            <div className="card-header">
-              <h2 className="card-title">PM 10 Levels</h2>
-            </div>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem'
+          }}>
+            {console.log('PM10 Chart Data:', data)}
             <PM10Chart data={data} userPreferences={userPreferences} />
-        </div>
-      </div>
-
-        {/* City Comparison */}
-        <div className="card large chart-card">
-          <div className="card-header">
-            <h2 className="card-title">City Air Quality Comparison</h2>
           </div>
-        <CityComparisonChart userPreferences={userPreferences} />
-      </div>
+        </div>
       </div>
     </div>
   );

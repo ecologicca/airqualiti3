@@ -1,0 +1,162 @@
+import React, { useState, useEffect } from 'react';
+import { FaThermometerHalf, FaWindowMaximize, FaSprayCan, FaFilter } from 'react-icons/fa';
+
+const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
+  const [settings, setSettings] = useState(initialSettings || {
+    windowsOpen: false,
+    nonToxicProducts: false,
+    recentFilterChange: false
+  });
+
+  useEffect(() => {
+    if (initialSettings) {
+      setSettings(initialSettings);
+    }
+  }, [initialSettings]);
+
+  const handleSettingChange = (setting) => {
+    const newSettings = {
+      ...settings,
+      [setting]: !settings[setting]
+    };
+    setSettings(newSettings);
+    onSettingsChange(newSettings);
+  };
+
+  // Calculate total reduction percentage
+  const calculateReduction = () => {
+    let reduction = 0;
+    if (settings.windowsOpen) reduction += 10;
+    if (settings.nonToxicProducts) reduction += 8;
+    if (settings.recentFilterChange) reduction += 15;
+    return reduction;
+  };
+
+  return (
+    <div className="air-quality-controls" style={{
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      padding: '24px',
+      marginBottom: '24px'
+    }}>
+      {/* Temperature Gauge */}
+      <div style={{
+        textAlign: 'center',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          display: 'inline-block',
+          position: 'relative',
+          width: '200px',
+          height: '100px',
+          background: 'linear-gradient(90deg, #043A24 0%, #D9F6BB 50%, #FF6B6B 100%)',
+          borderRadius: '100px 100px 0 0',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            position: 'absolute',
+            bottom: '0',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '4px',
+            height: '80px',
+            background: '#fff',
+            transformOrigin: 'bottom',
+            transform: `translateX(-50%) rotate(${-90 + (72 * 1)}deg)`,
+            transition: 'transform 0.5s ease'
+          }} />
+        </div>
+        <div style={{ marginTop: '12px' }}>
+          <FaThermometerHalf size={24} style={{ marginRight: '8px' }} />
+          <span style={{ fontSize: '24px', fontWeight: 'bold' }}>22°C</span>
+        </div>
+      </div>
+
+      {/* Air Quality Improvement Controls */}
+      <div style={{ marginTop: '24px' }}>
+        <h3 style={{ marginBottom: '16px' }}>Air Quality Improvements</h3>
+        <p style={{ 
+          textAlign: 'center', 
+          fontSize: '18px', 
+          color: '#043A24',
+          marginBottom: '20px'
+        }}>
+          Total PM2.5 Reduction: {calculateReduction()}%
+        </p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FaWindowMaximize />
+              <span>Windows Open</span>
+              <span style={{ color: '#666', fontSize: '14px' }}>(-10% PM2.5)</span>
+            </div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={settings.windowsOpen}
+                onChange={() => handleSettingChange('windowsOpen')}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FaSprayCan />
+              <span>Non-Toxic Cleaning Products</span>
+              <span style={{ color: '#666', fontSize: '14px' }}>(-8% PM2.5)</span>
+            </div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={settings.nonToxicProducts}
+                onChange={() => handleSettingChange('nonToxicProducts')}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FaFilter />
+              <span>Filter Replaced (Last 6 Weeks)</span>
+              <span style={{ color: '#666', fontSize: '14px' }}>(-15% PM2.5)</span>
+            </div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={settings.recentFilterChange}
+                onChange={() => handleSettingChange('recentFilterChange')}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AirQualityControls; 

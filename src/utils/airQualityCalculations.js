@@ -23,4 +23,33 @@ export const calculateIndoorWithDevices = (outdoorValue, hasHVAC, hasAirPurifier
   }
   
   return indoorValue;
+};
+
+// Calculate the reduction factor based on air quality settings
+export const calculatePM25Reduction = (airQualitySettings) => {
+  let reductionPercentage = 0;
+  
+  if (airQualitySettings?.windowsOpen) {
+    reductionPercentage += 10;
+  }
+  if (airQualitySettings?.nonToxicProducts) {
+    reductionPercentage += 8;
+  }
+  if (airQualitySettings?.recentFilterChange) {
+    reductionPercentage += 15;
+  }
+  
+  return 1 - (reductionPercentage / 100);
+};
+
+// Apply reduction to PM2.5 value
+export const applyPM25Reduction = (value, airQualitySettings) => {
+  const reductionFactor = calculatePM25Reduction(airQualitySettings);
+  return value * reductionFactor;
+};
+
+// Apply reduction to risk score
+export const applyRiskReduction = (riskScore, airQualitySettings) => {
+  const reductionFactor = calculatePM25Reduction(airQualitySettings);
+  return riskScore * reductionFactor;
 }; 

@@ -1,116 +1,59 @@
 // App.js
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './supabaseClient';
-import Navbar from './components/layout/Navbar';
-import Sidebar from './components/layout/Sidebar';
-import Dashboard from './pages/dashboard/Dashboard';
-import AnxietyDashboard from './pages/dashboard/AnxietyDashboard';
-import UserPreferences from './pages/UserPreferences';
-import Login from './pages/login';
-import SignUp from './pages/signUp';
-import Questionnaire from './pages/Questionnaire';
-import ResetPassword from './pages/ResetPassword';
-import SplashPage from './pages/SplashPage';
-import Insights from './pages/Insights';
-import Resources from './pages/Resources';
-import Settings from './pages/Settings';
+import { useAuth } from './hooks/useAuth';
+
+// Auth Pages
+import Login from './pages/auth/Login';
+import SignUp from './pages/auth/SignUp';
+import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/callback';
-import './styles/style.css';
+
+// Main Pages
+import Dashboard from './pages/dashboard/Dashboard';
+import Profile from './pages/profile';
+import Resources from './pages/Resources';
+import FAQ from './pages/FAQ';
+import Insights from './pages/Insights';
+import Settings from './pages/Settings';
+import WelcomePage from './pages/WelcomePage';
+import ThankYou from './pages/ThankYou';
+
+// Layout
+import Layout from './components/layout/Layout';
 
 const App = () => {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Only check session if we have beta access
-    if (localStorage.getItem('betaAccess') === 'true') {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  const { user, loading } = useAuth();
 
   if (loading) {
     return <div>Loading...</div>;
   }
 
-  // Check for beta access first
-  const hasBetaAccess = localStorage.getItem('betaAccess') === 'true';
-
   return (
     <Router>
-      <div className="app">
-                <Routes>
-          {/* Show splash page if no beta access */}
-          <Route
-            path="/"
-            element={
-              hasBetaAccess ? (
-                <Navigate to={session ? '/dashboard' : '/login'} />
-              ) : (
-                <SplashPage />
-              )
-            }
-          />
-          
-          {/* Public routes (only accessible with beta access) */}
-          {hasBetaAccess && (
-            <>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            </>
-          )}
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<Navigate to={user ? '/dashboard' : '/auth/login'} />} />
+        <Route path="/auth/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route path="/auth/signup" element={!user ? <SignUp /> : <Navigate to="/dashboard" />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/welcome" element={<WelcomePage />} />
+        <Route path="/thank-you" element={<ThankYou />} />
 
-          {/* Protected routes (require both beta access and session) */}
-          {hasBetaAccess && session ? (
-            <>
-              <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-              <Route path="/insights" element={<Layout><Insights /></Layout>} />
-              <Route path="/resources" element={<Layout><Resources /></Layout>} />
-              <Route path="/settings" element={<Layout><Settings /></Layout>} />
-              <Route path="/preferences" element={<Layout><UserPreferences /></Layout>} />
-              <Route path="/questionnaire" element={<Layout><Questionnaire /></Layout>} />
-              <Route path="/anxietydashboard" element={<Layout><AnxietyDashboard /></Layout>} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-            </>
-          ) : (
-            // Redirect to login or splash page depending on beta access
-            <Route 
-              path="*" 
-              element={<Navigate to={hasBetaAccess ? '/login' : '/'} />} 
-            />
-          )}
-          </Routes>
-      </div>
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={user ? <Layout><Dashboard /></Layout> : <Navigate to="/auth/login" />} />
+        <Route path="/profile" element={user ? <Layout><Profile /></Layout> : <Navigate to="/auth/login" />} />
+        <Route path="/resources" element={user ? <Layout><Resources /></Layout> : <Navigate to="/auth/login" />} />
+        <Route path="/faq" element={user ? <Layout><FAQ /></Layout> : <Navigate to="/auth/login" />} />
+        <Route path="/insights" element={user ? <Layout><Insights /></Layout> : <Navigate to="/auth/login" />} />
+        <Route path="/settings" element={user ? <Layout><Settings /></Layout> : <Navigate to="/auth/login" />} />
+
+        {/* 404 Route */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
     </Router>
   );
 };
-
-// Layout component to avoid repetition
-const Layout = ({ children }) => (
-  <>
-    <Navbar />
-    <div className="main-layout">
-      <Sidebar />
-      <div className="main-content">
-        {children}
-      </div>
-    </div>
-  </>
-);
 
 export default App;
