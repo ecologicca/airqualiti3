@@ -16,14 +16,154 @@
   background-color: #f8f9fa;
   min-height: calc(100vh - 60px);
   overflow-y: auto;
+  transition: margin-left 0.3s ease;
 }
 
+/* Navbar styles */
+.top-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #043A24;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 250px;
+  background-color: #043A24;
+  min-height: 100vh;
+  padding: 1rem 0;
+  transition: transform 0.3s ease;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  z-index: 900;
+}
+
+.nav-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link.active {
+  background-color: #D9F6BB;
+  color: #043A24;
+}
+
+.nav-link svg {
+  font-size: 1.25rem;
+}
+
+/* Mobile styles */
 @media (max-width: 768px) {
-  .main-layout {
-    flex-direction: column;
+  .mobile-menu-toggle {
+    display: block;
   }
-  
+
+  .sidebar {
+    transform: translateX(-100%);
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
   .main-content {
     padding: 1rem;
+    margin-left: 0 !important;
+  }
+
+  .main-layout {
+    padding-top: 60px;
+  }
+
+  .healthy-tip {
+    display: none;
+  }
+
+  /* Overlay when mobile menu is open */
+  .main-content::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 800;
+  }
+
+  .main-content.menu-open::before {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* Adjust navbar for mobile */
+  .top-navbar {
+    padding: 0 1rem;
+  }
+
+  .navbar-logo img {
+    height: 32px;
+  }
+
+  .navbar-right {
+    gap: 0.5rem;
+  }
+
+  .navbar-icon-button {
+    padding: 0.5rem;
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 769px) {
+  .main-content {
+    margin-left: 250px;
+  }
+
+  .sidebar {
+    transform: none !important;
   }
 } 

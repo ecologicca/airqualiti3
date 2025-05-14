@@ -2,13 +2,19 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import logo from '../../icons/logo.png';
-import { FaMoon, FaBell, FaUserCircle } from 'react-icons/fa';
+import { FaMoon, FaBell, FaUserCircle, FaBars, FaTimes } from 'react-icons/fa';
 
-const Navbar = () => {
+const Navbar = ({ onMenuToggle }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   const toggleDropdown = () => setDropdownOpen((prev) => !prev);
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+    onMenuToggle && onMenuToggle();
+  };
 
   const handleLogout = async () => {
     try {
@@ -31,9 +37,13 @@ const Navbar = () => {
 
   return (
     <nav className="top-navbar">
+      <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+        {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
+      </button>
+
       <div className="navbar-logo">
         <img src={logo} alt="Ecologicca" />
-        </div>
+      </div>
 
       <div className="navbar-right">
         <button className="navbar-icon-button">
@@ -46,13 +56,13 @@ const Navbar = () => {
           <button className="navbar-user-button" onClick={toggleDropdown}>
             <FaUserCircle />
           </button>
-        {dropdownOpen && (
+          {dropdownOpen && (
             <div className="navbar-dropdown">
               <button className="navbar-dropdown-item" onClick={handleLogout}>
                 Logout
               </button>
-          </div>
-        )}
+            </div>
+          )}
         </div>
       </div>
     </nav>
