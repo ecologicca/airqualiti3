@@ -7,11 +7,11 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
-    email: 'casey.reid@hotmail.com',
-    age: '34',
-    gender: 'Female',
-    location: 'San Francisco, CA',
-    joined: 'March 14, 2024',
+    email: '',
+    age: '',
+    gender: '',
+    location: '',
+    joined: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
     anxiety_base_level: '5',
     activity_level: '5',
     sleep_level: '3'
@@ -41,24 +41,33 @@ const Profile = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      setError(null);
       
-      if (!user) throw new Error('No user found');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('No user found');
+        return;
+      }
+
+      // Set email from auth
+      setFormData(prev => ({
+        ...prev,
+        email: user.email
+      }));
 
       const { data, error } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
 
-      if (error) throw error;
-
+      // Only update form data if we found preferences
       if (data) {
         setFormData(prev => ({
           ...prev,
           first_name: data.first_name || '',
           last_name: data.last_name || '',
-          location: locations.includes(data.city) ? data.city : 'San Francisco, CA',
+          location: locations.includes(data.city) ? data.city : '',
           anxiety_base_level: data.anxiety_base_level?.toString() || '5',
           activity_level: data.activity_level?.toString() || '5',
           sleep_level: data.sleep_level?.toString() || '3'
@@ -66,7 +75,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setError(error.message);
+      setError('Failed to load profile data');
     } finally {
       setLoading(false);
     }
@@ -75,16 +84,13 @@ const Profile = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      setError(null);
       
-      if (!user) throw new Error('No user found');
-
-      // First check if the user already has a profile
-      const { data: existingProfile } = await supabase
-        .from('user_preferences')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('No user found');
+        return;
+      }
 
       const profileData = {
         user_id: user.id,
@@ -93,27 +99,17 @@ const Profile = () => {
         city: formData.location,
         anxiety_base_level: parseInt(formData.anxiety_base_level),
         activity_level: parseInt(formData.activity_level),
-        sleep_level: parseInt(formData.sleep_level)
+        sleep_level: parseInt(formData.sleep_level),
+        updated_at: new Date().toISOString()
       };
 
-      let error;
-      
-      if (existingProfile) {
-        // Update existing profile
-        const { error: updateError } = await supabase
-          .from('user_preferences')
-          .update(profileData)
-          .eq('user_id', user.id);
-        error = updateError;
-      } else {
-        // Insert new profile
-        const { error: insertError } = await supabase
-          .from('user_preferences')
-          .insert(profileData);
-        error = insertError;
-      }
+      const { error: upsertError } = await supabase
+        .from('user_preferences')
+        .upsert(profileData, {
+          onConflict: 'user_id'
+        });
 
-      if (error) throw error;
+      if (upsertError) throw upsertError;
 
       // Trigger a real-time update for other components
       await supabase
@@ -143,43 +139,16 @@ const Profile = () => {
     }));
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>Loading profile...</div>;
+  if (error) return <div className="error">{error}</div>;
 
   return (
-    <div className="profile-container" style={{ padding: '2rem' }}>
+    <div className="profile-container">
       {successMessage && (
-        <div style={{
-          background: '#D9F6BB',
-          color: '#043A24',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          textAlign: 'center'
-        }}>
-          {successMessage}
-        </div>
+        <div className="success-message">{successMessage}</div>
       )}
-      {error && (
-        <div style={{
-          background: '#ffebee',
-          color: '#c62828',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          textAlign: 'center'
-        }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        maxWidth: '800px',
-        margin: '0 auto 2rem auto',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
+      
+      <div className="profile-section">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2rem' }}>
           <div style={{
             background: '#D9F6BB',
@@ -197,13 +166,7 @@ const Profile = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h1 style={{ color: '#043A24', margin: 0 }}>Personal Information</h1>
               <button
-                onClick={async () => {
-                  if (isEditing) {
-                    await handleSave();
-                  } else {
-                    setIsEditing(true);
-                  }
-                }}
+                onClick={() => setIsEditing(!isEditing)}
                 style={{
                   background: '#D9F6BB',
                   border: 'none',
@@ -214,93 +177,71 @@ const Profile = () => {
                   cursor: 'pointer'
                 }}
               >
-                {isEditing ? 'Save Profile' : 'Edit Profile'}
+                {isEditing ? 'Cancel' : 'Edit Profile'}
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Full Name</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem', fontWeight: '500' }}>
-                  {isEditing ? (
+            <div className="profile-info">
+              <div className="info-row">
+                <div className="info-label">Full Name</div>
+                {isEditing ? (
+                  <div className="info-edit">
                     <input
-                      type="text"
                       name="first_name"
                       value={formData.first_name}
                       onChange={handleChange}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        fontSize: '1.2rem',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px'
-                      }}
+                      placeholder="First Name"
                     />
-                  ) : (
-                    `${formData.first_name} ${formData.last_name}`
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Email</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem' }}>{formData.email}</div>
-              </div>
-
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Age</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem' }}>{formData.age}</div>
-              </div>
-
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Gender</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem' }}>{formData.gender}</div>
-              </div>
-
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Location</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem' }}>
-                  {isEditing ? (
-                    <select
-                      name="location"
-                      value={formData.location}
+                    <input
+                      name="last_name"
+                      value={formData.last_name}
                       onChange={handleChange}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        fontSize: '1.2rem',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        background: 'white'
-                      }}
-                    >
-                      {locations.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    formData.location
-                  )}
-                </div>
+                      placeholder="Last Name"
+                    />
+                  </div>
+                ) : (
+                  <div className="info-value">
+                    {formData.first_name || formData.last_name ? 
+                      `${formData.first_name} ${formData.last_name}`.trim() : 
+                      'Not set'}
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Joined</label>
-                <div style={{ color: '#043A24', fontSize: '1.2rem' }}>{formData.joined}</div>
+              <div className="info-row">
+                <div className="info-label">Email</div>
+                <div className="info-value">{formData.email}</div>
+              </div>
+
+              <div className="info-row">
+                <div className="info-label">Location</div>
+                {isEditing ? (
+                  <select
+                    name="location"
+                    value={formData.location}
+                    onChange={handleChange}
+                    className="info-select"
+                  >
+                    <option value="">Select a city</option>
+                    {locations.map(city => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="info-value">{formData.location || 'Not set'}</div>
+                )}
+              </div>
+
+              <div className="info-row">
+                <div className="info-label">Joined</div>
+                <div className="info-value">{formData.joined}</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        maxWidth: '800px',
-        margin: '0 auto',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
+      <div className="profile-section">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2rem' }}>
           <div style={{
             background: '#D9F6BB',
@@ -317,34 +258,28 @@ const Profile = () => {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h1 style={{ color: '#043A24', margin: 0 }}>Health Profile</h1>
-              <button
-                onClick={handleSave}
-                style={{
-                  background: '#D9F6BB',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '2rem',
-                  color: '#043A24',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                Save Changes
-              </button>
+              {isEditing && (
+                <button
+                  onClick={handleSave}
+                  style={{
+                    background: '#D9F6BB',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '2rem',
+                    color: '#043A24',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Changes
+                </button>
+              )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>
-                  Anxiety Base Level: {formData.anxiety_base_level}
-                </label>
-                <div style={{ 
-                  background: '#f0f0f0', 
-                  borderRadius: '8px',
-                  padding: '4px',
-                  position: 'relative',
-                  height: '24px'
-                }}>
+            <div className="profile-info">
+              <div className="info-row">
+                <div className="info-label">Anxiety Base Level</div>
+                {isEditing ? (
                   <input
                     type="range"
                     name="anxiety_base_level"
@@ -352,32 +287,16 @@ const Profile = () => {
                     max="10"
                     value={formData.anxiety_base_level}
                     onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      position: 'absolute',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      appearance: 'none',
-                      background: '#D9F6BB',
-                      height: '16px',
-                      borderRadius: '8px',
-                      outline: 'none'
-                    }}
+                    className="slider"
                   />
-                </div>
+                ) : (
+                  <div className="info-value">{formData.anxiety_base_level}</div>
+                )}
               </div>
 
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>
-                  Activity Level: {formData.activity_level}
-                </label>
-                <div style={{ 
-                  background: '#f0f0f0', 
-                  borderRadius: '8px',
-                  padding: '4px',
-                  position: 'relative',
-                  height: '24px'
-                }}>
+              <div className="info-row">
+                <div className="info-label">Activity Level</div>
+                {isEditing ? (
                   <input
                     type="range"
                     name="activity_level"
@@ -385,40 +304,29 @@ const Profile = () => {
                     max="10"
                     value={formData.activity_level}
                     onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      position: 'absolute',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      appearance: 'none',
-                      background: '#D9F6BB',
-                      height: '16px',
-                      borderRadius: '8px',
-                      outline: 'none'
-                    }}
+                    className="slider"
                   />
-                </div>
+                ) : (
+                  <div className="info-value">{formData.activity_level}</div>
+                )}
               </div>
 
-              <div>
-                <label style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>Sleep Level</label>
-                <select
-                  name="sleep_level"
-                  value={formData.sleep_level}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    fontSize: '1rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '8px',
-                    background: 'white'
-                  }}
-                >
-                  {sleepLevels.map(level => (
-                    <option key={level} value={level}>Level {level}</option>
-                  ))}
-                </select>
+              <div className="info-row">
+                <div className="info-label">Sleep Level</div>
+                {isEditing ? (
+                  <select
+                    name="sleep_level"
+                    value={formData.sleep_level}
+                    onChange={handleChange}
+                    className="info-select"
+                  >
+                    {sleepLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="info-value">{formData.sleep_level}</div>
+                )}
               </div>
             </div>
           </div>

@@ -2060,4 +2060,116 @@ body {
     width: 100%;
   }
   
+  /* Profile Page Styles */
+  .profile-container {
+    padding: 2rem;
+  }
+  
+  .profile-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto 2rem auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .info-label {
+    color: #666;
+    font-weight: 500;
+    flex: 0 0 200px;
+  }
+  
+  .info-value {
+    color: #043A24;
+    font-size: 1.1rem;
+    flex: 1;
+  }
+  
+  .info-edit {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+  }
+  
+  .info-edit input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  
+  .info-select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    background: white;
+  }
+  
+  .slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #D9F6BB;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #043A24;
+    cursor: pointer;
+  }
+  
+  .slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #043A24;
+    cursor: pointer;
+    border: none;
+  }
+  
+  .success-message {
+    background: #D9F6BB;
+    color: #043A24;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 2rem auto;
+  }
+  
+  .error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 2rem auto;
+  }
+  
   
