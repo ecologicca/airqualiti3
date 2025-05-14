@@ -52,4 +52,21 @@ export const applyPM25Reduction = (value, airQualitySettings) => {
 export const applyRiskReduction = (riskScore, airQualitySettings) => {
   const reductionFactor = calculatePM25Reduction(airQualitySettings);
   return riskScore * reductionFactor;
-}; 
+};
+
+try {
+    // Your existing code
+} catch (error) {
+    console.error('Detailed error:', {
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause,
+        // Add any relevant context
+        database: !!process.env.DATABASE_URL,
+        apis: {
+            waqi: !!process.env.WAQI_API_TOKEN,
+            weather: !!process.env.OPENWEATHER_API_KEY
+        }
+    });
+    throw error;
+} 
