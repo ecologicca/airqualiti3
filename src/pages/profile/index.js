@@ -55,22 +55,60 @@ const Profile = () => {
         email: user.email
       }));
 
-      const { data, error } = await supabase
+      // First check if user preferences exist
+      const { data: existingPrefs, error: checkError } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
+        .maybeSingle();
 
-      // Only update form data if we found preferences
-      if (data) {
+      if (checkError) {
+        console.error('Error checking preferences:', checkError);
+        setError('Failed to load profile data');
+        return;
+      }
+
+      if (existingPrefs) {
+        // Update form with existing preferences
         setFormData(prev => ({
           ...prev,
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          location: locations.includes(data.city) ? data.city : '',
-          anxiety_base_level: data.anxiety_base_level?.toString() || '5',
-          activity_level: data.activity_level?.toString() || '5',
-          sleep_level: data.sleep_level?.toString() || '3'
+          first_name: existingPrefs.first_name || '',
+          last_name: existingPrefs.last_name || '',
+          location: locations.includes(existingPrefs.city) ? existingPrefs.city : '',
+          anxiety_base_level: existingPrefs.anxiety_base_level?.toString() || '5',
+          activity_level: existingPrefs.activity_level?.toString() || '5',
+          sleep_level: existingPrefs.sleep_level?.toString() || '3'
+        }));
+      } else {
+        // Create default preferences
+        const defaultPrefs = {
+          user_id: user.id,
+          first_name: '',
+          last_name: '',
+          city: '',
+          anxiety_base_level: 5,
+          activity_level: 5,
+          sleep_level: 3,
+          created_at: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('user_preferences')
+          .insert([defaultPrefs]);
+
+        if (insertError) {
+          console.error('Error creating default preferences:', insertError);
+          setError('Failed to initialize profile');
+          return;
+        }
+
+        // Set form data with defaults
+        setFormData(prev => ({
+          ...prev,
+          ...defaultPrefs,
+          anxiety_base_level: defaultPrefs.anxiety_base_level.toString(),
+          activity_level: defaultPrefs.activity_level.toString(),
+          sleep_level: defaultPrefs.sleep_level.toString()
         }));
       }
     } catch (error) {
