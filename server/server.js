@@ -2,26 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
-const { initializeSupabase } = require('./services/supabaseService');
 
 // Load environment variables
-dotenv.config({ path: path.join(__dirname, '.env') });
-
-// Initialize services
-initializeSupabase();
-
-// Log loaded environment variables
-console.log('Environment variables loaded:', {
-  SUPABASE_URL: process.env.SUPABASE_URL ? 'Set' : 'Not set',
-  HAS_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
-  HAS_BETA_CODE: !!process.env.BETA_CODE
-});
+dotenv.config();
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../build')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -30,6 +22,12 @@ app.use((err, req, res, next) => {
     status: 'error',
     message: 'Something went wrong!'
   });
+});
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../build/index.html'));
 });
 
 const PORT = process.env.PORT || 3001;
