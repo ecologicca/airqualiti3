@@ -10,27 +10,18 @@ const UserPreferences = () => {
     birthdate: null,
     city: '',
     has_HVAC: false,
-    has_ecologgica: false,
-    anxiety_base_level: 5, // Default middle value
-    activity_level: 5, // Default middle value
-    sleep_level: 'moderate' // Will be mapped to numeric values
+    has_ecologicca: false,
+    anxiety_base_level: 5,
+    activity_level: 5,
+    sleep_level: 5,
+    track_anxiety: false,
+    has_pets: false,
+    allergies: [],
+    health_issues: []
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-
-  // Map sleep quality levels to numeric values
-  const sleepQualityMap = {
-    'low': 2,
-    'moderate': 5,
-    'high': 9
-  };
-
-  const sleepQualityOptions = [
-    { value: 'low', label: 'Low' },
-    { value: 'moderate', label: 'Moderate' },
-    { value: 'high', label: 'High' }
-  ];
 
   useEffect(() => {
     fetchPreferences();
@@ -62,7 +53,7 @@ const UserPreferences = () => {
           ...data,
           anxiety_base_level: data.anxiety_base_level || 5,
           activity_level: data.activity_level || 5,
-          sleep_level: Object.entries(sleepQualityMap).find(([key, value]) => value === data.sleep_level)?.[0] || 'moderate'
+          sleep_level: data.sleep_level || 5
         });
         }
       } catch (error) {
@@ -90,7 +81,6 @@ const UserPreferences = () => {
       const dataToSave = {
         ...preferences,
         user_id: user.id,
-        sleep_level: sleepQualityMap[preferences.sleep_level],
         updated_at: new Date().toISOString()
       };
 
@@ -133,19 +123,6 @@ const UserPreferences = () => {
           </div>
 
           <div className="form-group">
-              <label>Last Name</label>
-            <input
-              type="text"
-              value={preferences.last_name}
-                onChange={(e) => setPreferences({ ...preferences, last_name: e.target.value })}
-                className="form-input"
-                placeholder="Enter last name"
-            />
-            </div>
-          </div>
-
-          <div className="form-row">
-          <div className="form-group">
               <label>Birthdate</label>
               <input
                 type="date"
@@ -154,7 +131,9 @@ const UserPreferences = () => {
                 className="form-input"
             />
           </div>
+          </div>
 
+          <div className="form-row">
           <div className="form-group">
               <label>City</label>
             <select
@@ -183,12 +162,12 @@ const UserPreferences = () => {
               min="1"
               max="10"
               value={preferences.anxiety_base_level}
-                onChange={(e) => setPreferences({ ...preferences, anxiety_base_level: parseInt(e.target.value) })}
-                className="form-slider"
-              />
-            </div>
+              onChange={(e) => setPreferences({ ...preferences, anxiety_base_level: parseInt(e.target.value) })}
+              className="form-slider"
+            />
+          </div>
 
-            <div className="form-group">
+          <div className="form-group">
               <label>Activity Level: {preferences.activity_level}</label>
               <input
                 type="range"
@@ -196,25 +175,22 @@ const UserPreferences = () => {
                 max="10"
                 value={preferences.activity_level}
                 onChange={(e) => setPreferences({ ...preferences, activity_level: parseInt(e.target.value) })}
-              className="form-slider"
-            />
+                className="form-slider"
+              />
             </div>
           </div>
 
           <div className="form-row">
-          <div className="form-group">
-              <label>Sleep Quality</label>
-              <select
+            <div className="form-group">
+              <label>Sleep Level: {preferences.sleep_level}</label>
+              <input
+                type="range"
+                min="1"
+                max="10"
                 value={preferences.sleep_level}
-                onChange={(e) => setPreferences({ ...preferences, sleep_level: e.target.value })}
-                className="form-select"
-              >
-                {sleepQualityOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(e) => setPreferences({ ...preferences, sleep_level: parseInt(e.target.value) })}
+                className="form-slider"
+              />
             </div>
           </div>
 
@@ -233,8 +209,8 @@ const UserPreferences = () => {
             <label className="checkbox-label">
               <input
                 type="checkbox"
-                checked={preferences.has_ecologgica}
-                onChange={(e) => setPreferences({ ...preferences, has_ecologgica: e.target.checked })}
+                checked={preferences.has_ecologicca}
+                onChange={(e) => setPreferences({ ...preferences, has_ecologicca: e.target.checked })}
               />
               I have a Blue Air purifier
             </label>

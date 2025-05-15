@@ -107,37 +107,80 @@ const Dashboard = () => {
 
   const fetchUserPreferences = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        setIsLoading(false);
+        return;
+      }
+
       if (!user) {
         console.log('No authenticated user found');
+        setIsLoading(false);
+        navigate('/login');
         return;
       }
 
-      const { data: preferences, error } = await supabase
+      console.log('Fetching preferences for user:', user.id);
+      
+      // First check if preferences exist
+      const { data: existingPrefs, error: checkError } = await supabase
         .from('user_preferences')
         .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error fetching user preferences:', error.message);
+      if (checkError) {
+        console.error('Error checking preferences:', checkError);
+        setIsLoading(false);
         return;
       }
 
-      if (preferences) {
-        setUserPreferences(preferences);
-      } else {
-        console.log('No preferences found for user');
-        // Set default preferences
-        setUserPreferences({
-          city: 'Toronto', // Default city
-          anxiety_base_level: 5,
-          activity_level: 5,
-          sleep_level: 3
-        });
+      // If preferences exist, use the first one
+      if (existingPrefs && existingPrefs.length > 0) {
+        console.log('Found preferences:', existingPrefs[0]);
+        setUserPreferences(existingPrefs[0]);
+        return;
       }
+
+      // If no preferences exist, create default ones
+      console.log('Creating default preferences for user:', user.id);
+      const defaultPrefs = {
+        user_id: user.id,
+        city: 'Toronto',
+        first_name: '',
+        last_name: '',
+        anxiety_base_level: 5,
+        activity_level: 5,
+        sleep_level: 3,
+        has_HVAC: false,
+        has_ecologicca: false,
+        has_pets: false,
+        track_anxiety: false,
+        birthdate: null,
+        allergies: [],
+        health_issues: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: insertError } = await supabase
+        .from('user_preferences')
+        .insert([defaultPrefs])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating default preferences:', insertError);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Created new preferences:', defaultPrefs);
+      setUserPreferences(defaultPrefs);
+      
     } catch (error) {
-      console.error('Error in fetchUserPreferences:', error.message);
+      console.error('Error in fetchUserPreferences:', error);
+      setIsLoading(false);
     }
   };
 
@@ -145,10 +188,12 @@ const Dashboard = () => {
     try {
       setIsRefreshing(true);
       if (!userPreferences?.city) {
-        console.log('No city selected');
+        console.log('No city selected, skipping data fetch');
+        setIsLoading(false);
         return;
       }
 
+      console.log('Fetching data for city:', userPreferences.city);
       const { data: airData, error: airError } = await supabase
         .from('weather_data')
         .select('*')
@@ -156,8 +201,19 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(30);
 
-      if (airError) throw airError;
+      if (airError) {
+        console.error('Error fetching weather data:', airError);
+        throw airError;
+      }
 
+      if (!airData || airData.length === 0) {
+        console.log('No data found for city:', userPreferences.city);
+        setData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Raw air data:', airData);
       const transformedData = airData.map(item => {
         const pm25 = parseFloat(item.pm25 || item['PM 2.5'] || 0);
         const pm10 = parseFloat(item.pm10 || item['PM 10'] || 0);
@@ -172,6 +228,7 @@ const Dashboard = () => {
         };
       }).filter(item => item['PM 2.5'] > 0 || item['PM 10'] > 0);
       
+      console.log('Transformed data:', transformedData);
       setData(transformedData);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -415,7 +472,9 @@ const Dashboard = () => {
           fontSize: '1.75rem',
           marginBottom: '0.5rem'
         }}>
-          {userPreferences?.first_name ? `${userPreferences.first_name}'s ` : ''}
+          {userPreferences?.first_name ? 
+            `${userPreferences.first_name}${userPreferences.last_name ? ' ' + userPreferences.last_name : ''}'s ` : 
+            ''}
           Personal Health Impact Report
         </h1>
         <div style={{

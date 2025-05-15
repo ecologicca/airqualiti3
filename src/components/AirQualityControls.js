@@ -84,19 +84,14 @@ const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
           Total PM2.5 Reduction: {calculateReduction()}%
         </p>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FaWindowMaximize />
-              <span>Windows Open</span>
-              <span style={{ color: '#666', fontSize: '14px' }}>(-10% PM2.5)</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '24px' }}>
+          <div className="air-quality-control-row">
+            <div className="control-label">
+              <FaWindowMaximize size={24} color="#002B19" />
+              <div className="label-content">
+                <span>Windows Open</span>
+                <span className="reduction-label">(-10% PM2.5)</span>
+              </div>
             </div>
             <label className="switch">
               <input
@@ -104,22 +99,17 @@ const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
                 checked={settings.windowsOpen}
                 onChange={() => handleSettingChange('windowsOpen')}
               />
-              <span className="slider round"></span>
+              <span className="slider"></span>
             </label>
           </div>
 
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FaSprayCan />
-              <span>Non-Toxic Cleaning Products</span>
-              <span style={{ color: '#666', fontSize: '14px' }}>(-8% PM2.5)</span>
+          <div className="air-quality-control-row">
+            <div className="control-label">
+              <FaSprayCan size={24} color="#002B19" />
+              <div className="label-content">
+                <span>Non-Toxic Cleaning Products</span>
+                <span className="reduction-label">(-8% PM2.5)</span>
+              </div>
             </div>
             <label className="switch">
               <input
@@ -127,22 +117,17 @@ const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
                 checked={settings.nonToxicProducts}
                 onChange={() => handleSettingChange('nonToxicProducts')}
               />
-              <span className="slider round"></span>
+              <span className="slider"></span>
             </label>
           </div>
 
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FaFilter />
-              <span>Filter Replaced (Last 6 Weeks)</span>
-              <span style={{ color: '#666', fontSize: '14px' }}>(-15% PM2.5)</span>
+          <div className="air-quality-control-row">
+            <div className="control-label">
+              <FaFilter size={24} color="#002B19" />
+              <div className="label-content">
+                <span>Filter Replaced (Last 6 Weeks)</span>
+                <span className="reduction-label">(-15% PM2.5)</span>
+              </div>
             </div>
             <label className="switch">
               <input
@@ -150,7 +135,7 @@ const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
                 checked={settings.recentFilterChange}
                 onChange={() => handleSettingChange('recentFilterChange')}
               />
-              <span className="slider round"></span>
+              <span className="slider"></span>
             </label>
           </div>
         </div>
