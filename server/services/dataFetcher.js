@@ -220,10 +220,15 @@ async function fetchAirQualityData(city) {
                 : null;
         };
 
-        // Calculate final values - remove data_source field
+        // Always use current date instead of API timestamp
+        const now = new Date();
+        // Round to current hour
+        now.setUTCMinutes(0, 0, 0);
+
+        // Calculate final values
         const result = {
             city: city,
-            created_at: new Date().toISOString(),
+            created_at: now.toISOString(), // Use current time
             pm25: processMetric('pm25'),
             pm10: processMetric('pm10'),
             no2: processMetric('no2'),
@@ -269,17 +274,11 @@ async function storeDataInSupabase(data) {
             throw new Error('No valid data to insert');
         }
 
-        // Round timestamps to the nearest hour and ensure UTC timezone
+        // Use the timestamps that were already rounded in fetchAirQualityData
         const processedData = validData.map(item => {
-            const date = new Date(item.created_at);
-            date.setUTCMinutes(0, 0, 0); // Set minutes, seconds, milliseconds to 0 in UTC
-            
             // Remove data_source field if it exists
             const { data_source, ...cleanedItem } = item;
-            return {
-                ...cleanedItem,
-                created_at: date.toISOString()
-            };
+            return cleanedItem;
         });
 
         // Log the exact data being sent to Supabase
@@ -311,6 +310,8 @@ async function storeDataInSupabase(data) {
 
                 if (updateError) {
                     console.warn(`Error updating record for ${record.city}:`, updateError);
+                } else {
+                    console.log(`Successfully updated record for ${record.city}`);
                 }
             } else {
                 // Insert new record
@@ -320,6 +321,8 @@ async function storeDataInSupabase(data) {
 
                 if (insertError) {
                     console.warn(`Error inserting record for ${record.city}:`, insertError);
+                } else {
+                    console.log(`Successfully inserted new record for ${record.city}`);
                 }
             }
         }
