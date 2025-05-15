@@ -79,6 +79,7 @@ function removeOutliers(readings) {
 
 async function fetchWAQIData(city) {
     try {
+        console.log(`WAQI API request for ${city} starting...`);
         const response = await fetch(
             `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
         );
@@ -88,12 +89,18 @@ async function fetchWAQIData(city) {
         }
 
         const waqiData = await response.json();
+        console.log(`WAQI API raw response for ${city}:`, JSON.stringify(waqiData));
         
         if (waqiData.status !== 'ok' || !waqiData.data) {
-            throw new Error(`WAQI API error: ${waqiData.status} - ${waqiData.data}`);
+            throw new Error(`WAQI API error: ${waqiData.status} - ${JSON.stringify(waqiData)}`);
         }
 
-        return {
+        // Check if we have the expected data structure
+        if (!waqiData.data.iaqi) {
+            throw new Error(`WAQI API missing iaqi data for ${city}: ${JSON.stringify(waqiData.data)}`);
+        }
+
+        const result = {
             pm25: waqiData.data.iaqi?.pm25?.v ? parseFloat(waqiData.data.iaqi.pm25.v) : null,
             pm10: waqiData.data.iaqi?.pm10?.v ? parseFloat(waqiData.data.iaqi.pm10.v) : null,
             no2: waqiData.data.iaqi?.no2?.v ? parseFloat(waqiData.data.iaqi.no2.v) : null,
@@ -102,6 +109,16 @@ async function fetchWAQIData(city) {
             aqi: waqiData.data.aqi,
             source: 'waqi'
         };
+
+        console.log(`WAQI API processed data for ${city}:`, result);
+
+        // Validate that we have at least some valid readings
+        const hasValidData = Object.values(result).some(value => value !== null && value !== undefined);
+        if (!hasValidData) {
+            throw new Error(`No valid readings found in WAQI data for ${city}`);
+        }
+
+        return result;
     } catch (error) {
         console.error(`WAQI API error for ${city}:`, error.message);
         return null;
@@ -110,17 +127,21 @@ async function fetchWAQIData(city) {
 
 async function fetchOpenWeatherData(city) {
     try {
+        console.log(`OpenWeather API request for ${city} starting...`);
         const coords = await getLocationCoords(city);
         if (!coords) {
-            throw new Error('Could not get coordinates for city');
+            throw new Error(`Could not get coordinates for city: ${city}`);
         }
 
+        console.log(`Got coordinates for ${city}:`, coords);
         const response = await axios.get(
             `${OPENWEATHER_BASE_URL}/air_pollution?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}`
         );
 
+        console.log(`OpenWeather API raw response for ${city}:`, JSON.stringify(response.data));
+
         if (!response.data || !response.data.list || !response.data.list[0]) {
-            throw new Error('Invalid OpenWeather API response structure');
+            throw new Error(`Invalid OpenWeather API response structure for ${city}`);
         }
 
         // OpenWeather AQI conversion to match WAQI scale (they use 1-5 scale)
@@ -134,7 +155,7 @@ async function fetchOpenWeatherData(city) {
 
         const aqiValue = openWeatherToWAQI[response.data.list[0].main.aqi] || null;
 
-        return {
+        const result = {
             pm25: response.data.list[0].components.pm2_5,
             pm10: response.data.list[0].components.pm10,
             no2: response.data.list[0].components.no2,
@@ -143,6 +164,9 @@ async function fetchOpenWeatherData(city) {
             aqi: aqiValue,
             source: 'openweather'
         };
+
+        console.log(`OpenWeather API processed data for ${city}:`, result);
+        return result;
     } catch (error) {
         console.error(`OpenWeather API error for ${city}:`, error.message);
         return null;
@@ -168,8 +192,8 @@ async function fetchAirQualityData(city) {
         }
 
         // If WAQI failed or returned incomplete data, try OpenWeather
-        if (readings.length === 0 || readings.some(r => r.pm25 === null)) {
-            console.log(`WAQI data incomplete for ${city}, trying OpenWeather...`);
+        if (readings.length === 0) {
+            console.log(`WAQI data not available for ${city}, trying OpenWeather...`);
             const openWeatherData = await fetchOpenWeatherData(city);
             if (openWeatherData) {
                 readings = [openWeatherData];
@@ -330,7 +354,7 @@ async function manualFetch() {
                     console.log(`Successfully fetched data for ${city}:`, cityData);
                     results.push(cityData);
                 } else {
-                    console.log(`No data available for ${city}`);
+                    console.log(`No valid data available for ${city}, skipping...`);
                 }
             } catch (error) {
                 console.error(`Error fetching data for ${city}:`, error);
@@ -339,11 +363,16 @@ async function manualFetch() {
         }
 
         if (results.length === 0) {
-            throw new Error('Failed to fetch data for any cities');
+            console.log('No data was successfully fetched for any cities');
+            return { 
+                success: false, 
+                error: 'Failed to fetch data for any cities',
+                citiesAttempted: cities
+            };
         }
 
         console.log('Attempting to store data for cities:', results.map(r => r.city).filter(Boolean));
-        const storedData = await storeDataInSupabase(results.filter(r => r !== null));
+        const storedData = await storeDataInSupabase(results.filter(r => r && r.city));
         
         return { 
             success: true, 
