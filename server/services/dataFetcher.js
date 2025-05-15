@@ -77,46 +77,116 @@ function removeOutliers(readings) {
     return readings.filter(x => x >= lowerBound && x <= upperBound);
 }
 
+async function fetchWAQIData(city) {
+    try {
+        const response = await fetch(
+            `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
+        );
+        
+        if (!response.ok) {
+            throw new Error(`WAQI API responded with status: ${response.status}`);
+        }
+
+        const waqiData = await response.json();
+        
+        if (waqiData.status !== 'ok' || !waqiData.data) {
+            throw new Error(`WAQI API error: ${waqiData.status} - ${waqiData.data}`);
+        }
+
+        return {
+            pm25: waqiData.data.iaqi?.pm25?.v ? parseFloat(waqiData.data.iaqi.pm25.v) : null,
+            pm10: waqiData.data.iaqi?.pm10?.v ? parseFloat(waqiData.data.iaqi.pm10.v) : null,
+            no2: waqiData.data.iaqi?.no2?.v ? parseFloat(waqiData.data.iaqi.no2.v) : null,
+            so2: waqiData.data.iaqi?.so2?.v ? parseFloat(waqiData.data.iaqi.so2.v) : null,
+            co: waqiData.data.iaqi?.co?.v ? parseFloat(waqiData.data.iaqi.co.v) : null,
+            aqi: waqiData.data.aqi,
+            source: 'waqi'
+        };
+    } catch (error) {
+        console.error(`WAQI API error for ${city}:`, error.message);
+        return null;
+    }
+}
+
+async function fetchOpenWeatherData(city) {
+    try {
+        const coords = await getLocationCoords(city);
+        if (!coords) {
+            throw new Error('Could not get coordinates for city');
+        }
+
+        const response = await axios.get(
+            `${OPENWEATHER_BASE_URL}/air_pollution?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}`
+        );
+
+        if (!response.data || !response.data.list || !response.data.list[0]) {
+            throw new Error('Invalid OpenWeather API response structure');
+        }
+
+        // OpenWeather AQI conversion to match WAQI scale (they use 1-5 scale)
+        const openWeatherToWAQI = {
+            1: 25,  // Good
+            2: 50,  // Fair
+            3: 100, // Moderate
+            4: 150, // Poor
+            5: 300  // Very Poor
+        };
+
+        const aqiValue = openWeatherToWAQI[response.data.list[0].main.aqi] || null;
+
+        return {
+            pm25: response.data.list[0].components.pm2_5,
+            pm10: response.data.list[0].components.pm10,
+            no2: response.data.list[0].components.no2,
+            so2: response.data.list[0].components.so2,
+            co: response.data.list[0].components.co,
+            aqi: aqiValue,
+            source: 'openweather'
+        };
+    } catch (error) {
+        console.error(`OpenWeather API error for ${city}:`, error.message);
+        return null;
+    }
+}
+
 async function fetchAirQualityData(city) {
     try {
-        // Get multiple readings over a short period
-        const readings = [];
-        const numReadings = 3; // Number of readings to average
-        const delayBetweenReadings = 2000; // 2 seconds between readings
-
-        for (let i = 0; i < numReadings; i++) {
-            const response = await fetch(
-                `https://api.waqi.info/feed/${city}/?token=${process.env.WAQI_API_TOKEN}`
-            );
-            const data = await response.json();
-            
-            // Store both raw and processed readings
-            if (data.data?.iaqi?.pm25?.v) {
-                readings.push({
-                    pm25: parseFloat(data.data.iaqi.pm25.v),
-                    pm10: data.data?.iaqi?.pm10?.v ? parseFloat(data.data.iaqi.pm10.v) : null,
-                    no2: data.data?.iaqi?.no2?.v ? parseFloat(data.data.iaqi.no2.v) : null,
-                    so2: data.data?.iaqi?.so2?.v ? parseFloat(data.data.iaqi.so2.v) : null,
-                    co: data.data?.iaqi?.co?.v ? parseFloat(data.data.iaqi.co.v) : null,
-                });
+        console.log(`Attempting to fetch data for ${city}...`);
+        
+        // Try WAQI API first
+        console.log(`Trying WAQI API for ${city}...`);
+        let readings = [];
+        let primarySource = 'waqi';
+        
+        // Make multiple attempts with WAQI
+        for (let i = 0; i < 3; i++) {
+            const waqiData = await fetchWAQIData(city);
+            if (waqiData) {
+                readings.push(waqiData);
+                if (i < 2) await new Promise(resolve => setTimeout(resolve, 2000));
             }
-            
-            // Wait before next reading
-            if (i < numReadings - 1) {
-                await new Promise(resolve => setTimeout(resolve, delayBetweenReadings));
+        }
+
+        // If WAQI failed or returned incomplete data, try OpenWeather
+        if (readings.length === 0 || readings.some(r => r.pm25 === null)) {
+            console.log(`WAQI data incomplete for ${city}, trying OpenWeather...`);
+            const openWeatherData = await fetchOpenWeatherData(city);
+            if (openWeatherData) {
+                readings = [openWeatherData];
+                primarySource = 'openweather';
             }
         }
 
         if (readings.length === 0) {
-            console.log(`No valid readings obtained for ${city}`);
+            console.log(`No data available for ${city} from either API`);
             return null;
         }
 
-        // Process each metric separately
+        // Process metrics and handle potential outliers
         const processMetric = (metricName) => {
             const metricReadings = readings
                 .map(r => r[metricName])
-                .filter(v => v !== null);
+                .filter(v => v !== null && !isNaN(v));
             
             if (metricReadings.length === 0) return null;
 
@@ -126,24 +196,31 @@ async function fetchAirQualityData(city) {
                 : null;
         };
 
-        // Calculate smoothed values for each metric
-        const smoothedData = {
+        // Calculate final values
+        const result = {
+            city: city,
+            created_at: new Date().toISOString(),
             pm25: processMetric('pm25'),
             pm10: processMetric('pm10'),
             no2: processMetric('no2'),
             so2: processMetric('so2'),
             co: processMetric('co'),
+            air_quality: processMetric('aqi'),
+            data_source: primarySource
         };
 
-        return {
-            city: city,
-            created_at: new Date().toISOString(),
-            ...smoothedData,
-            raw_pm25: readings[0]?.pm25 || null, // Store the first raw reading
-            air_quality: data.data?.aqi?.toString() || null,
-        };
+        // Validate the result
+        const hasValidData = result.pm25 !== null || result.air_quality !== null;
+        if (!hasValidData) {
+            console.log(`No valid metrics found for ${city} after processing`);
+            return null;
+        }
+
+        console.log(`Successfully processed data for ${city} from ${primarySource}:`, result);
+        return result;
+
     } catch (error) {
-        console.error(`Error fetching data for ${city}:`, error);
+        console.error(`Error in fetchAirQualityData for ${city}:`, error);
         return null;
     }
 }
@@ -248,8 +325,13 @@ async function manualFetch() {
             try {
                 console.log(`Fetching data for ${city}...`);
                 const cityData = await fetchAirQualityData(city);
-                console.log(`Successfully fetched data for ${city}:`, cityData);
-                results.push(cityData);
+                
+                if (cityData) {
+                    console.log(`Successfully fetched data for ${city}:`, cityData);
+                    results.push(cityData);
+                } else {
+                    console.log(`No data available for ${city}`);
+                }
             } catch (error) {
                 console.error(`Error fetching data for ${city}:`, error);
                 // Continue with other cities even if one fails
@@ -260,13 +342,13 @@ async function manualFetch() {
             throw new Error('Failed to fetch data for any cities');
         }
 
-        console.log('Attempting to store data for cities:', results.map(r => r.city));
-        const storedData = await storeDataInSupabase(results);
+        console.log('Attempting to store data for cities:', results.map(r => r.city).filter(Boolean));
+        const storedData = await storeDataInSupabase(results.filter(r => r !== null));
         
         return { 
             success: true, 
             message: 'Data fetch and storage completed',
-            citiesProcessed: results.map(r => r.city),
+            citiesProcessed: results.map(r => r?.city).filter(Boolean),
             storedDataCount: storedData.length
         };
     } catch (error) {
