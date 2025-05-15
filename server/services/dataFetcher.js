@@ -220,7 +220,7 @@ async function fetchAirQualityData(city) {
                 : null;
         };
 
-        // Calculate final values
+        // Calculate final values - remove data_source field
         const result = {
             city: city,
             created_at: new Date().toISOString(),
@@ -229,8 +229,7 @@ async function fetchAirQualityData(city) {
             no2: processMetric('no2'),
             so2: processMetric('so2'),
             co: processMetric('co'),
-            air_quality: processMetric('aqi'),
-            data_source: primarySource
+            air_quality: processMetric('aqi')
         };
 
         // Validate the result
@@ -274,8 +273,11 @@ async function storeDataInSupabase(data) {
         const processedData = validData.map(item => {
             const date = new Date(item.created_at);
             date.setUTCMinutes(0, 0, 0); // Set minutes, seconds, milliseconds to 0 in UTC
+            
+            // Remove data_source field if it exists
+            const { data_source, ...cleanedItem } = item;
             return {
-                ...item,
+                ...cleanedItem,
                 created_at: date.toISOString()
             };
         });
