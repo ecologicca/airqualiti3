@@ -107,7 +107,7 @@ async function fetchWAQIData(city) {
             so2: waqiData.data.iaqi?.so2?.v ? parseFloat(waqiData.data.iaqi.so2.v) : null,
             co: waqiData.data.iaqi?.co?.v ? parseFloat(waqiData.data.iaqi.co.v) : null,
             aqi: waqiData.data.aqi,
-            source: 'waqi'
+            temp: waqiData.data.iaqi?.t?.v ? parseFloat(waqiData.data.iaqi.t.v) : null
         };
 
         console.log(`WAQI API processed data for ${city}:`, result);
@@ -134,13 +134,23 @@ async function fetchOpenWeatherData(city) {
         }
 
         console.log(`Got coordinates for ${city}:`, coords);
-        const response = await axios.get(
+        
+        // Get air quality data
+        const airQualityResponse = await axios.get(
             `${OPENWEATHER_BASE_URL}/air_pollution?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}`
         );
 
-        console.log(`OpenWeather API raw response for ${city}:`, JSON.stringify(response.data));
+        // Get current weather data for temperature
+        const weatherResponse = await axios.get(
+            `${OPENWEATHER_BASE_URL}/weather?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}&units=metric`
+        );
 
-        if (!response.data || !response.data.list || !response.data.list[0]) {
+        console.log(`OpenWeather API raw response for ${city}:`, {
+            airQuality: airQualityResponse.data,
+            weather: weatherResponse.data
+        });
+
+        if (!airQualityResponse.data || !airQualityResponse.data.list || !airQualityResponse.data.list[0]) {
             throw new Error(`Invalid OpenWeather API response structure for ${city}`);
         }
 
@@ -153,16 +163,16 @@ async function fetchOpenWeatherData(city) {
             5: 300  // Very Poor
         };
 
-        const aqiValue = openWeatherToWAQI[response.data.list[0].main.aqi] || null;
+        const aqiValue = openWeatherToWAQI[airQualityResponse.data.list[0].main.aqi] || null;
 
         const result = {
-            pm25: response.data.list[0].components.pm2_5,
-            pm10: response.data.list[0].components.pm10,
-            no2: response.data.list[0].components.no2,
-            so2: response.data.list[0].components.so2,
-            co: response.data.list[0].components.co,
+            pm25: airQualityResponse.data.list[0].components.pm2_5,
+            pm10: airQualityResponse.data.list[0].components.pm10,
+            no2: airQualityResponse.data.list[0].components.no2,
+            so2: airQualityResponse.data.list[0].components.so2,
+            co: airQualityResponse.data.list[0].components.co,
             aqi: aqiValue,
-            source: 'openweather'
+            temp: weatherResponse.data.main?.temp || null
         };
 
         console.log(`OpenWeather API processed data for ${city}:`, result);
@@ -234,7 +244,8 @@ async function fetchAirQualityData(city) {
             no2: processMetric('no2'),
             so2: processMetric('so2'),
             co: processMetric('co'),
-            air_quality: processMetric('aqi')
+            air_quality: processMetric('aqi'),
+            temp: processMetric('temp')
         };
 
         // Validate the result
