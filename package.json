@@ -51,6 +51,7 @@
     "react-tooltip": "^5.28.1"
   },
   "devDependencies": {
+    "@fullhuman/postcss-purgecss": "^7.0.2",
     "concurrently": "^8.2.2",
     "nodemon": "^3.0.2"
   },

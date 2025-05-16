@@ -1,0 +1,320 @@
+.insights-container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard-title {
+  color: #043A24;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Insight Banner */
+.insight-banner {
+  background: #eaf7ee;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.insight-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.info-icon {
+  color: #043A24;
+  font-size: 1.25rem;
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.insight-message p {
+  margin: 0;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* Main Content Grid */
+.main-content-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+/* Content Cards */
+.content-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 100%;
+}
+
+/* Connected Devices Card */
+.devices-card .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.devices-card h2 {
+  color: #043A24;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.add-device-button {
+  background: #D9F6BB;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 100px;
+  color: #043A24;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.devices-list {
+  flex: 1 1 auto;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 1rem;
+  padding-right: 4px;
+}
+
+.device-card {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  justify-content: space-between;
+}
+
+.device-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.device-icon {
+  background: #D9F6BB;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #043A24;
+  font-size: 1.25rem;
+}
+
+.device-details h3 {
+  margin: 0 0 0.25rem 0;
+  color: #043A24;
+  font-size: 1rem;
+}
+
+.device-details p {
+  margin: 0;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.device-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.status-indicator::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.connected::before {
+  background: #4CAF50;
+}
+
+.status-indicator.disconnected::before {
+  background: #f44336;
+}
+
+.device-menu {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: #666;
+}
+
+/* Air Quality Improvements Card */
+.improvements-card h2 {
+  color: #043A24;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.total-reduction {
+  color: #043A24;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.improvements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.improvement-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.improvement-icon {
+  color: #043A24;
+  font-size: 1.25rem;
+  margin-right: 1rem;
+}
+
+.improvement-item span {
+  flex: 1;
+  color: #333;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #043A24;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .main-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .insights-container {
+    padding: 1rem;
+  }
+
+  .device-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .device-status {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .improvement-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+}
+
+.insights-charts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  margin-top: 2rem;
+}
+.insights-chart-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(4, 58, 36, 0.08);
+  padding: 2rem 2rem 2.5rem 2rem;
+}
+
+.insights-main-row-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(4, 58, 36, 0.08);
+  padding: 2rem 2rem 2.5rem 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.insights-main-row {
+  display: flex;
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.devices-card,
+.improvements-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .insights-main-row {
+    flex-direction: column;
+    gap: 2rem;
+  }
+  .insights-main-row-card {
+    padding: 1rem;
+  }
+}

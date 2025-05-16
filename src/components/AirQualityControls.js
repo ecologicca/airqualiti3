@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaThermometerHalf, FaWindowMaximize, FaSprayCan, FaFilter } from 'react-icons/fa';
+import { FaWindowMaximize, FaSprayCan, FaFilter } from 'react-icons/fa';
 
 const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
   const [settings, setSettings] = useState(initialSettings || {
@@ -39,39 +39,6 @@ const AirQualityControls = ({ onSettingsChange, initialSettings }) => {
       padding: '24px',
       marginBottom: '24px'
     }}>
-      {/* Temperature Gauge */}
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '24px'
-      }}>
-        <div style={{
-          display: 'inline-block',
-          position: 'relative',
-          width: '200px',
-          height: '100px',
-          background: 'linear-gradient(90deg, #043A24 0%, #D9F6BB 50%, #FF6B6B 100%)',
-          borderRadius: '100px 100px 0 0',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '4px',
-            height: '80px',
-            background: '#fff',
-            transformOrigin: 'bottom',
-            transform: `translateX(-50%) rotate(${-90 + (72 * 1)}deg)`,
-            transition: 'transform 0.5s ease'
-          }} />
-        </div>
-        <div style={{ marginTop: '12px' }}>
-          <FaThermometerHalf size={24} style={{ marginRight: '8px' }} />
-          <span style={{ fontSize: '24px', fontWeight: 'bold' }}>22°C</span>
-        </div>
-      </div>
-
       {/* Air Quality Improvement Controls */}
       <div style={{ marginTop: '24px' }}>
         <h3 style={{ marginBottom: '16px' }}>Air Quality Improvements</h3>
